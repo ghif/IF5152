@@ -1,0 +1,25 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data & Models cache
+data/*.mp4
+!data/README.md
+*.pth
+*.pt
+*.bin
+checkpoints/
+.cache/
+
+# Conda / Virtualenv
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE & OS
+.DS_Store
+.vscode/
+.idea/

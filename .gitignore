@@ -1,0 +1,28 @@
+# Python & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Large Video Datasets & Media
+*.mp4
+*.mkv
+*.avi
+*.mov
+!video-understanding-lab/data/README.md
+
+# PyTorch & Hugging Face Checkpoints
+*.pth
+*.pt
+*.bin
+*.safetensors
+checkpoints/
+.cache/
+
+# Environments & IDEs
+.env
+.venv
+env/
+venv/
+.DS_Store
+.vscode/
+.idea/
