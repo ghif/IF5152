@@ -4,11 +4,11 @@ __pycache__/
 *$py.class
 
 # Large Video Datasets & Media
+data/
 *.mp4
 *.mkv
 *.avi
 *.mov
-!data/README.md
 
 # PyTorch & Hugging Face Checkpoints
 *.pth

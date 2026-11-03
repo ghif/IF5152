@@ -9,7 +9,7 @@ Welcome to the course repository for **IF5152 (Advanced Computer Vision)**. This
 
 | Module / Directory | Topic | Key Concepts | Hardware Support |
 | :--- | :--- | :--- | :--- |
-| **[`video-understanding-lab/`](./video-understanding-lab)** | **Video Understanding (Week 11)** | Video I/O bottlenecks, Late Fusion, Spatio-Temporal Transformers (VideoMAE), Zero-Shot Video Search (CLIP) | Apple Silicon (MPS), NVIDIA GPU (CUDA), CPU |
+| **[`video-understanding-lab/`](./video-understanding-lab)** | **Video Understanding (Week 11)** | Video I/O bottlenecks, Late Fusion, Video Transformers (VideoMAE), Zero-Shot CLIP Search, Local M4 MPS Training | Apple Silicon (MPS), NVIDIA GPU (CUDA), CPU |
 
 ---
 
@@ -37,6 +37,9 @@ python 01_video_io_and_late_fusion.py --device mps
 # 5. Run Session 2 Demo (Video Transformer & Zero-Shot Search)
 python 02_video_transformer_inference.py --device mps
 python 03_zeroshot_video_search.py --device mps
+
+# 6. Run Session 3 (Local Training on Apple M4 MPS)
+python 04_train_late_fusion_head.py --device mps --epochs 20
 ```
 
-Refer to [`video-understanding-lab/README.md`](./video-understanding-lab/README.md) for detailed pedagogical notes, tensor dimensions, and slide mappings.
+Refer to [`video-understanding-lab/README.md`](./video-understanding-lab/README.md) and the [`video-understanding-lab/docs/`](./video-understanding-lab/docs) directory for detailed self-study learning guides, theoretical derivations, tensor dimensions, and lecture slide mappings.
