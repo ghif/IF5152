@@ -40,7 +40,7 @@ import torch
 from transformers import CLIPProcessor, CLIPModel
 from PIL import Image
 
-from utils import get_device, print_device_info, read_video_pyav
+from utils import get_device, print_device_info, read_video_pyav, resolve_data_path
 
 
 # Candidate open-vocabulary queries for demonstration.
@@ -69,9 +69,10 @@ def main():
                         help="Target device: 'auto' | 'mps' | 'cuda' | 'cpu'")
     args = parser.parse_args()
 
-    # 1. Hardware Inspection
+    # 1. Hardware Inspection & Video Path Resolution
     device = get_device(args.device)
     print_device_info(device)
+    video_path = resolve_data_path(args.video)
 
     # 2. Load the Pretrained Vision-Language Foundation Model
     print(f"\n--- [STEP 1] Loading Multimodal Foundation Model: {args.model} ---")
@@ -84,7 +85,7 @@ def main():
 
     # 3. Decode Sampled Frames from Video
     print(f"\n--- [STEP 2] Decoding {args.num_frames} Video Frames ---")
-    raw_frames = read_video_pyav(args.video, num_frames=args.num_frames, fast_seek=True)
+    raw_frames = read_video_pyav(video_path, num_frames=args.num_frames, fast_seek=True)
     # Convert numpy arrays to PIL Images for the CLIP processor
     pil_frames = [Image.fromarray(f) for f in raw_frames]
     print(f"Decoded {len(pil_frames)} frames across the video duration.")

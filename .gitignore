@@ -8,7 +8,7 @@ __pycache__/
 *.mkv
 *.avi
 *.mov
-!video-understanding-lab/data/README.md
+!data/README.md
 
 # PyTorch & Hugging Face Checkpoints
 *.pth

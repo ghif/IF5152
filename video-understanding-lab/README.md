@@ -13,15 +13,17 @@ It is designed to run seamlessly across:
 ## 📁 Repository Structure
 
 ```text
-video-understanding-lab/
-├── 01_video_io_and_late_fusion.py    # Session 1: Video I/O bottleneck & Late Fusion (Mean vs GRU)
-├── 02_video_transformer_inference.py # Session 2: Pretrained VideoMAE (Kinetics-400)
-├── 03_zeroshot_video_search.py       # Session 2: Open-Vocabulary Video-Language Matching (CLIP)
-├── download_samples.py               # Helper script to fetch sample video clips
-├── utils.py                          # Device management (MPS/CUDA/CPU) & PyAV decoder
-├── environment.yml                   # Conda environment definition
-├── requirements.txt                  # Pip dependencies
-└── data/                             # Video clips directory
+IF5152/
+├── data/                             # Shared course data directory (root level)
+└── video-understanding-lab/          # Week 11 Module
+    ├── 01_video_io_and_late_fusion.py    # Session 1: Video I/O bottleneck & Late Fusion (Mean vs GRU)
+    ├── 02_video_transformer_inference.py # Session 2: Pretrained VideoMAE (Kinetics-400)
+    ├── 03_zeroshot_video_search.py       # Session 2: Open-Vocabulary Video-Language Matching (CLIP)
+    ├── download_samples.py               # Helper script to fetch sample video clips into data/
+    ├── utils.py                          # Device management & PyAV fast decoder
+    ├── environment.yml                   # Conda environment definition
+    ├── requirements.txt                  # Pip dependencies
+    └── README.md                         # Module documentation
 ```
 
 ---

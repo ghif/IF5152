@@ -8,9 +8,31 @@ Pedagogical Purpose:
     students why random frame access requires timestamp seeking rather than naive loops.
 =====================================================================================
 """
+import os
 import av
 import numpy as np
 import torch
+
+
+def resolve_data_path(file_path: str = "person_bicycle.mp4") -> str:
+    """
+    Intelligently resolves data path whether the script is invoked from the
+    repository root (IF5152/) or from inside a child directory (video-understanding-lab/).
+    """
+    filename = os.path.basename(file_path)
+    root_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+    
+    candidates = [
+        file_path,                                    # Literal path passed by user
+        os.path.join(root_data_dir, filename),        # <root>/data/<filename>
+        os.path.join("data", filename),               # ./data/<filename>
+        os.path.join("..", "data", filename),          # ../data/<filename>
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    # Fallback to root data path (useful for downloader target)
+    return os.path.join(root_data_dir, filename)
 
 
 def get_device(requested: str = "auto") -> torch.device:

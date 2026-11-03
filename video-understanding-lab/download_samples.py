@@ -13,26 +13,29 @@ PEDAGOGICAL PURPOSE:
 """
 import os
 import urllib.request
+from utils import resolve_data_path
 
 # Public demonstration clips (standard benchmark test snippets)
 SAMPLES = {
     # Outdoor surveillance clip featuring people, bicycles, and moving cars
-    "data/person_bicycle.mp4": "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/person-bicycle-car-detection.mp4",
+    "person_bicycle.mp4": "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/person-bicycle-car-detection.mp4",
 }
 
 
 def main():
-    os.makedirs("data", exist_ok=True)
-    print("Checking and fetching demonstration video clips into 'data/'...")
+    root_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+    os.makedirs(root_data_dir, exist_ok=True)
+    print(f"Targeting shared repository data directory: {root_data_dir}")
 
-    for path, url in SAMPLES.items():
-        if os.path.exists(path) and os.path.getsize(path) > 0:
-            print(f"  [ALREADY PRESENT] {path} ({os.path.getsize(path) / 1024:.1f} KB)")
+    for filename, url in SAMPLES.items():
+        target_path = resolve_data_path(filename)
+        if os.path.exists(target_path) and os.path.getsize(target_path) > 0:
+            print(f"  [ALREADY PRESENT] {target_path} ({os.path.getsize(target_path) / 1024:.1f} KB)")
             continue
-        print(f"  [DOWNLOADING] {url} -> {path}...")
+        print(f"  [DOWNLOADING] {url} -> {target_path}...")
         try:
-            urllib.request.urlretrieve(url, path)
-            print(f"  [DOWNLOAD OK] Saved {path} ({os.path.getsize(path) / 1024:.1f} KB)")
+            urllib.request.urlretrieve(url, target_path)
+            print(f"  [DOWNLOAD OK] Saved {target_path} ({os.path.getsize(target_path) / 1024:.1f} KB)")
         except Exception as e:
             print(f"  [ERROR] Failed to download {url}: {e}")
 

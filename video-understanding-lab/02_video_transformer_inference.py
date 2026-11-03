@@ -34,7 +34,7 @@ import numpy as np
 import torch
 from transformers import AutoImageProcessor, VideoMAEForVideoClassification
 
-from utils import get_device, print_device_info, read_video_pyav
+from utils import get_device, print_device_info, read_video_pyav, resolve_data_path
 
 
 def main():
@@ -51,9 +51,10 @@ def main():
                         help="Target device: 'auto' | 'mps' | 'cuda' | 'cpu'")
     args = parser.parse_args()
 
-    # 1. Hardware Inspection
+    # 1. Hardware Inspection & Video Path Resolution
     device = get_device(args.device)
     print_device_info(device)
+    video_path = resolve_data_path(args.video)
 
     # 2. Load the Preprocessing Pipeline
     # The processor handles video normalization, spatial resizing to 224x224, and tensor conversion
@@ -62,8 +63,8 @@ def main():
 
     # 3. Decode Video Frames using PyAV (Fast Seek)
     print(f"\n--- [STEP 2] Decoding Video Clip ---")
-    print(f"Sampling {args.num_frames} frames from '{args.video}'...")
-    raw_frames = read_video_pyav(args.video, num_frames=args.num_frames, fast_seek=True)
+    print(f"Sampling {args.num_frames} frames from '{video_path}'...")
+    raw_frames = read_video_pyav(video_path, num_frames=args.num_frames, fast_seek=True)
     print(f"Raw decoded array shape: {raw_frames.shape} (Frames, Height, Width, RGB Channels)")
 
     # 4. Prepare Inputs for the Video Transformer

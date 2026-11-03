@@ -45,7 +45,7 @@ import torch.nn as nn
 from torchvision import models, transforms
 from PIL import Image
 
-from utils import get_device, print_device_info, read_video_pyav, sample_frame_indices
+from utils import get_device, print_device_info, read_video_pyav, sample_frame_indices, resolve_data_path
 
 
 # ======================================================================================
@@ -205,18 +205,19 @@ def main():
                         help="Target device: 'auto' (MPS on Mac, CUDA on Cloud/Linux, CPU fallback)")
     args = parser.parse_args()
 
-    # 1. Hardware Inspection
+    # 1. Hardware Inspection & Video Path Resolution
     device = get_device(args.device)
     print_device_info(device)
+    video_path = resolve_data_path(args.video)
 
     # 2. Decoding Benchmark (Industrial Perspective)
     print("\n--- [STEP 1] Industrial I/O Decoding Benchmark ---")
-    results = benchmark_decoders(args.video, args.num_frames)
+    results = benchmark_decoders(video_path, args.num_frames)
     t_cv, n_cv = results["opencv"]
     t_naive, n_naive = results["pyav_naive"]
     t_seek, n_seek, raw_frames = results["pyav_seek"]
 
-    print(f"Target Video Clip : {args.video} (Sample {args.num_frames} frames)")
+    print(f"Target Video Clip : {video_path} (Sample {args.num_frames} frames)")
     print(f"  1. OpenCV (Sequential Loop)             : {t_cv:6.2f} ms")
     print(f"  2. PyAV Naive (Single-threaded Loop)    : {t_naive:6.2f} ms")
     print(f"  3. PyAV Fast Seek (Industrial Standard) : {t_seek:6.2f} ms")
