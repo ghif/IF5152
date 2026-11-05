@@ -151,13 +151,13 @@ flowchart TD
 Once raw frames are decoded, they undergo a multi-stage transformation into a normalized 5D PyTorch tensor:
 
 ```mermaid
-flowchart LR
-    A["Raw Compressed Packets (Disk)"] -->|FFmpeg Demux + Decode| B["YUV420p Planar Arrays"]
-    B -->|sws_scale (Color Conversion)| C["RGB24 NumPy Array [T, H, W, 3]<br/>uint8: range [0, 255]"]
-    C -->|Bilinear Spatial Interpolation| D["Resized Frames [T, 224, 224, 3]"]
-    D -->|ToTensor (Scale to [0.0, 1.0])| E["Float32 Tensor [T, 3, 224, 224]"]
-    E -->|ImageNet Standardization| F["Normalized Tensor [T, 3, 224, 224]"]
-    F -->|unsqueeze(0)| G["Batched 5D Video Tensor<br/>[B=1, T=16, C=3, H=224, W=224]"]
+flowchart TD
+    A["Raw Compressed Packets (Disk)"] -->|"FFmpeg Demux + Decode"| B["YUV420p Planar Arrays"]
+    B -->|"Color Conversion (sws_scale)"| C["RGB24 NumPy Array (T, H, W, 3)<br/>uint8: range 0 to 255"]
+    C -->|"Bilinear Spatial Resizing"| D["Resized Frames (T, 224, 224, 3)"]
+    D -->|"Scale to 0.0 - 1.0 (ToTensor)"| E["Float32 Tensor (T, 3, 224, 224)"]
+    E -->|"ImageNet Standardization"| F["Normalized Tensor (T, 3, 224, 224)"]
+    F -->|"Add Batch Dimension (unsqueeze 0)"| G["Batched 5D Video Tensor<br/>Shape: (B=1, T=16, C=3, H=224, W=224)"]
 ```
 
 #### Mathematical Steps in Preprocessing:
@@ -181,12 +181,12 @@ Once spatial feature vectors $\mathbf{h}_t \in \mathbb{R}^{576}$ are extracted f
 ```mermaid
 flowchart TD
     V["Raw Video MP4"] --> D["PyAV Fast Keyframe Decode"]
-    D --> S["Uniformly Sampled 16 Frames<br/>Shape: [1, 16, 3, 224, 224]"]
-    S --> F["Flatten [B*T, C, H, W]"]
+    D --> S["Uniformly Sampled 16 Frames<br/>Shape: (1, 16, 3, 224, 224)"]
+    S --> F["Flatten to (B*T, C, H, W)"]
     F --> B["MobileNetV3-Small Backbone<br/>(ImageNet Pretrained)"]
-    B --> E["Extracted Features: [1, 16, 576]"]
-    E --> M1["Option A: Mean Pooling<br/>Mean across T -> [1, 576]"]
-    E --> M2["Option B: GRU Modeling<br/>Hidden state h_T -> [1, 256]"]
+    B --> E["Extracted Features: (1, 16, 576)"]
+    E --> M1["Option A: Mean Pooling<br/>Mean across T -> (1, 576)"]
+    E --> M2["Option B: GRU Modeling<br/>Hidden state h_T -> (1, 256)"]
     M1 --> C1["Linear Head -> 10 Classes"]
     M2 --> C2["Linear Head -> 10 Classes"]
 ```
