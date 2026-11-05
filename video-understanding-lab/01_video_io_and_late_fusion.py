@@ -6,22 +6,22 @@ File: 01_video_io_and_late_fusion.py
 
 PEDAGOGICAL & THEORETICAL FOUNDATIONS:
 ----------------------------------------------------------------------------------------
-1. Lecture Slide 9: "Video = 2D + Time"
+1. Video Representation: "Video = 2D + Time"
    - An image is a 3D tensor: [C x H x W]
    - A video clip is a 4D tensor: [T x C x H x W] (or 5D batched: [B x T x C x H x W])
    - Challenge: Processing raw video (e.g. 30 fps, 1080p) blows up memory and compute!
 
-2. Lecture Slides 14-16: "Training on Clips"
+2. Training on Clips:
    - Rather than feeding entire long videos, we extract short clips sampled at low FPS
      using uniform temporal sampling.
 
-3. Lecture Slides 17-20: "Single-Frame CNN vs Late Fusion"
-   - Single-Frame CNN (Slide 17): Classify each frame independently, average test predictions.
-   - Late Fusion (Slides 18-20): Extract deep spatial feature maps from each frame using
+3. Single-Frame CNN vs Late Fusion:
+   - Single-Frame CNN: Classify each frame independently, average test predictions.
+   - Late Fusion: Extract deep spatial feature maps from each frame using
      a 2D CNN backbone, then fuse temporal information before the classification layer.
      We compare:
-       (a) Average Pooling over time (Slide 19)
-       (b) Recurrent GRU modeling (Slide 63)
+       (a) Average Pooling over time (order-invariant)
+       (b) Recurrent GRU modeling (order-sensitive)
 
 4. Industrial Perspective: "The I/O Decoding Bottleneck"
    - A major real-world bottleneck in video deep learning is video decoding on CPU.
@@ -118,7 +118,7 @@ def benchmark_decoders(video_path: str, num_frames: int = 16):
 
 class LateFusionVideoClassifier(nn.Module):
     """
-    Implementation of Late Fusion (Lecture Slides 18-20 & 63):
+    Implementation of Late Fusion Architecture:
     
     Data Flow & Tensor Transformations:
       1. Input Video Tensor   : [Batch, Time, Channels, Height, Width]  e.g. [1, 16, 3, 224, 224]
@@ -126,8 +126,8 @@ class LateFusionVideoClassifier(nn.Module):
       3. Extracted Features   : [(Batch * Time), Feat_Dim]              e.g. [16, 576]
       4. Reshape to Spatio-Temporal: [Batch, Time, Feat_Dim]            e.g. [1, 16, 576]
       5. Temporal Aggregation :
-           - Option 'mean'    : Average across Time dimension -> [Batch, Feat_Dim] (Slide 19)
-           - Option 'gru'     : Recurrent sequence modeling   -> [Batch, Hidden_Dim] (Slide 63)
+           - Option 'mean'    : Average across Time dimension -> [Batch, Feat_Dim]
+           - Option 'gru'     : Recurrent sequence modeling   -> [Batch, Hidden_Dim]
       6. Classification Head  : Linear layer -> [Batch, Num_Classes]
     """
     def __init__(self, num_classes: int = 10, fusion: str = "mean"):
@@ -223,7 +223,7 @@ def main():
     print(f"  3. PyAV Fast Seek (Industrial Standard) : {t_seek:6.2f} ms")
     print(f"==> PyAV with Keyframe Seeking is {t_cv / max(0.001, t_seek):.1f}x faster than OpenCV!")
 
-    # 3. Constructing the 5D Video Tensor (Lecture Slide 9)
+    # 3. Constructing the 5D Video Tensor
     print("\n--- [STEP 2] Constructing the 5D Video Tensor ---")
     # Standard ImageNet normalization: (x - mean) / std
     transform = transforms.Compose([
@@ -241,13 +241,20 @@ def main():
     tensor_kb = video_tensor.element_size() * video_tensor.nelement() / 1024.0
     print(f"Tensor VRAM Footprint on {device.type.upper()}: {tensor_kb:.2f} KB")
 
-    # 4. Model Forward Pass & Latency Measurement
+    # 4. Model Architecture & Forward Pass
     print(f"\n--- [STEP 3] Late Fusion Model ({args.fusion.upper()}) ---")
     model = LateFusionVideoClassifier(num_classes=10, fusion=args.fusion).to(device)
     model.eval()
 
     total_params = sum(p.numel() for p in model.parameters())
     print(f"Backbone + Fusion Total Parameters : {total_params:,}")
+
+    # Print model architecture
+    print("\n" + "=" * 65)
+    print(f" MODEL ARCHITECTURE ({args.fusion.upper()} FUSION)")
+    print("=" * 65)
+    print(model)
+    print("=" * 65 + "\n")
 
     with torch.no_grad():
         t0 = time.perf_counter()
