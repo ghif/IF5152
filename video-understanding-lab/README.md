@@ -20,11 +20,13 @@ IF5152/
     │   ├── 01_video_io_and_late_fusion.md
     │   ├── 02_video_transformer_inference.md
     │   ├── 03_zeroshot_video_search.md
-    │   └── 04_train_late_fusion_head.md
+    │   ├── 04_train_late_fusion_head.md
+    │   └── 05_spatiotemporal_3d_cnns.md
     ├── 01_video_io_and_late_fusion.py    # Session 1: Video I/O bottleneck & Late Fusion (Mean vs GRU)
     ├── 02_video_transformer_inference.py # Session 2: Pretrained VideoMAE (Kinetics-400)
     ├── 03_zeroshot_video_search.py       # Session 2: Open-Vocabulary Video-Language Matching (CLIP)
     ├── 04_train_late_fusion_head.py      # Session 3: Train / Fine-tune Temporal Head on Apple M4 MPS
+    ├── 05_spatiotemporal_3d_cnns.py      # Session 1B: Spatio-Temporal 3D CNNs (R3D, R(2+1)D, MC3)
     ├── download_samples.py               # Helper script to fetch sample video clips into data/
     ├── utils.py                          # Device management & PyAV fast decoder
     ├── environment.yml                   # Conda environment definition
@@ -44,6 +46,7 @@ To enable students to learn autonomously, run the code independently, and deeply
 | [`02_video_transformer_inference.py`](02_video_transformer_inference.py) | [**`docs/02_video_transformer_inference.md`**](docs/02_video_transformer_inference.md) | Spatio-Temporal Attention & VideoMAE | Quadratic complexity of Space-Time Attention, Divided Attention (TimeSformer/VideoMAE), 3D Tubelet embeddings, Kinetics-400 |
 | [`03_zeroshot_video_search.py`](03_zeroshot_video_search.py) | [**`docs/03_zeroshot_video_search.md`**](docs/03_zeroshot_video_search.md) | Multimodal Video-Language & CLIP | Closed-set limits vs Open-vocabulary search, Dual-encoder multimodal matching (CLIP), Unit hypersphere normalization, Vector DB search |
 | [`04_train_late_fusion_head.py`](04_train_late_fusion_head.py) | [**`docs/04_train_late_fusion_head.md`**](docs/04_train_late_fusion_head.md) | Temporal Head Training & Optimization | Local training on Apple Silicon M4 MPS, Feature caching, Backpropagation Through Time (BPTT), Recurrent GRU vs Mean Pooling |
+| [`05_spatiotemporal_3d_cnns.py`](05_spatiotemporal_3d_cnns.py) | [**`docs/05_spatiotemporal_3d_cnns.md`**](docs/05_spatiotemporal_3d_cnns.md) | Spatio-Temporal 3D CNNs & Factorization | 3D Volumetric Convolutions, $(2+1)\text{D}$ Spatial-Temporal Factorization, Mixed Convolutions (MC3), I3D Weight Inflation, `[B, C, T, H, W]` layout |
 
 *Each companion guide includes theoretical derivations, Mermaid architecture flowcharts, tensor dimension tracing tables, execution playbooks, expected outputs, self-study exercises, and troubleshooting tips.*
 
@@ -92,6 +95,29 @@ python download_samples.py
 
   # Explicit device selection (auto | mps | cuda | cpu)
   python 01_video_io_and_late_fusion.py --device mps
+  ```
+
+---
+
+### Session 1B: Spatio-Temporal 3D CNNs & Architectural Factorization
+* **Core Topics**: Full 3D Convolutions ($R3D$), $(2+1)\text{D}$ Spatial-Temporal Factorization ($R(2+1)D$), Mixed Convolutions ($MC3$), I3D Weight Inflation.
+* **Self-Study Guide**: 📖 [3D CNNs & Architectural Factorization Guide](docs/05_spatiotemporal_3d_cnns.md)
+* **Industrial Reality**: 3D convolutions capture joint space-time patterns (optical flow, trajectories) directly in early layers. Factorizing $3 \times 3 \times 3$ into $(1 \times 3 \times 3) + (3 \times 1 \times 1)$ cuts parameters by over 50% and doubles non-linear activations (ReLU), making models easier to train and faster to converge.
+* **Run Demos**:
+
+  **1. Run Factorized R(2+1)D on Apple Silicon MPS:**
+  ```bash
+  python 05_spatiotemporal_3d_cnns.py --model r2plus1d --device mps
+  ```
+
+  **2. Inspect Layer Decompositions & Factorized Stems:**
+  ```bash
+  python 05_spatiotemporal_3d_cnns.py --model r2plus1d --print-model
+  ```
+
+  **3. Head-to-Head Architectural Benchmark (R3D vs R(2+1)D vs MC3):**
+  ```bash
+  python 05_spatiotemporal_3d_cnns.py --model all --device mps
   ```
 
 ---

@@ -10,7 +10,7 @@ Welcome to the course repository for **IF5152 (Advanced Computer Vision)**. This
 | Module / Directory | Topic | Key Concepts | Hardware Support |
 | :--- | :--- | :--- | :--- |
 | **[`generative-models/`](./generative-models)** | **Generative Models (Lecture 13 & 14)** | Exact Likelihood (PixelCNN), Latent Failure Modes (Vanilla AE), ELBO & Reparameterization (VAE), Minimax Game (DCGAN), Iterative Denoising (DDPM) | Apple Silicon (MPS), NVIDIA GPU (CUDA), CPU |
-| **[`video-understanding-lab/`](./video-understanding-lab)** | **Video Understanding (Week 11)** | Video I/O bottlenecks, Late Fusion, Video Transformers (VideoMAE), Zero-Shot CLIP Search, Local M4 MPS Training | Apple Silicon (MPS), NVIDIA GPU (CUDA), CPU |
+| **[`video-understanding-lab/`](./video-understanding-lab)** | **Video Understanding (Week 11)** | Video I/O bottlenecks, Late Fusion, 3D Spatio-Temporal CNNs (R3D, R(2+1)D, MC3), Video Transformers (VideoMAE), Zero-Shot CLIP Search, Local M4 MPS Training | Apple Silicon (MPS), NVIDIA GPU (CUDA), CPU |
 
 ---
 
@@ -35,11 +35,14 @@ python download_samples.py
 # 4. Run Session 1 Demo (I/O & Late Fusion)
 python 01_video_io_and_late_fusion.py --device mps
 
-# 5. Run Session 2 Demo (Video Transformer & Zero-Shot Search)
+# 5. Run Session 1B Demo (3D CNNs & Factorization Benchmark)
+python 05_spatiotemporal_3d_cnns.py --model all --device mps
+
+# 6. Run Session 2 Demo (Video Transformer & Zero-Shot Search)
 python 02_video_transformer_inference.py --device mps
 python 03_zeroshot_video_search.py --device mps
 
-# 6. Run Session 3 (Local Training on Apple M4 MPS)
+# 7. Run Session 3 (Local Training on Apple M4 MPS)
 python 04_train_late_fusion_head.py --device mps --epochs 20
 ```
 
