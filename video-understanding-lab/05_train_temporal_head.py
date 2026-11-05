@@ -1,12 +1,12 @@
 """
 ========================================================================================
-IF5152: Video Understanding - Session 3 Lab
-File: 04_train_late_fusion_head.py
+IF5152: Video Understanding - Session 5 Lab
+File: 05_train_temporal_head.py
 ========================================================================================
 
 PEDAGOGICAL & THEORETICAL FOUNDATIONS:
 ----------------------------------------------------------------------------------------
-1. Lecture Slides 18-20 & 63: "Training Temporal Sequence Models on Video"
+1. Training Temporal Sequence Models on Video:
    - Video models require modeling transitions across time.
    - End-to-end training of 3D CNNs or full video transformers requires massive multi-GPU
      clusters and days of compute.
@@ -21,8 +21,8 @@ PEDAGOGICAL & THEORETICAL FOUNDATIONS:
      unified memory, each training epoch drops from minutes to FRACTIONS OF A SECOND!
 
 3. Inductive Bias Comparison:
-   - Temporal Mean Pooling (Slide 19): Order-invariant baseline.
-   - Recurrent GRU (Slide 63): Order-aware recurrent modeling with Backpropagation
+   - Temporal Mean Pooling: Order-invariant baseline.
+   - Recurrent GRU: Order-aware recurrent modeling with Backpropagation
      Through Time (BPTT).
 
 DATASET MODES:
@@ -33,13 +33,13 @@ DATASET MODES:
 
 USAGE:
   # Fast training with GRU on Apple Silicon M4 MPS:
-  python 04_train_late_fusion_head.py --device mps --epochs 20 --fusion gru
+  python 05_train_temporal_head.py --device mps --epochs 20 --fusion gru
 
   # Baseline comparison with Temporal Mean Pooling:
-  python 04_train_late_fusion_head.py --device mps --epochs 20 --fusion mean
+  python 05_train_temporal_head.py --device mps --epochs 20 --fusion mean
 
   # 100% Offline test using synthetic motion videos:
-  python 04_train_late_fusion_head.py --dataset synthetic --device mps
+  python 05_train_temporal_head.py --dataset synthetic --device mps
 ========================================================================================
 """
 import argparse
@@ -500,7 +500,7 @@ def main():
         print(f"  {cls_name:<23} : {cls_correct}/{cls_total:<12} {cls_acc:5.1f}%  {bar}")
     print("-" * 55)
 
-    print("\n[SUCCESS] Session 3 (Training Late Fusion Head) completed.")
+    print("\n[SUCCESS] Session 5 (Training Temporal Head) completed.")
 
 
 if __name__ == "__main__":

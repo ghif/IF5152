@@ -1,12 +1,12 @@
 """
 ========================================================================================
-IF5152: Video Understanding - Session 2 Lab (Part B)
-File: 03_zeroshot_video_search.py
+IF5152: Video Understanding - Session 4 Lab
+File: 04_zeroshot_video_search.py
 ========================================================================================
 
 PEDAGOGICAL & THEORETICAL FOUNDATIONS:
 ----------------------------------------------------------------------------------------
-1. Lecture Slides 99-105: "Multimodal Video Understanding"
+1. Multimodal Video Understanding:
    - Earlier video architectures were "closed-set": trained to recognize a fixed list of
      classes (e.g., 101 UCF classes or 400 Kinetics classes).
    - Limitation: Real-world video applications (content moderation, CCTV monitoring,
@@ -29,8 +29,8 @@ PEDAGOGICAL & THEORETICAL FOUNDATIONS:
      requiring ZERO training labels for new domains or new action queries!
 
 USAGE:
-  python 03_zeroshot_video_search.py --video data/person_bicycle.mp4
-  python 03_zeroshot_video_search.py --video data/person_bicycle.mp4 --device mps
+  python 04_zeroshot_video_search.py --video data/person_bicycle.mp4
+  python 04_zeroshot_video_search.py --video data/person_bicycle.mp4 --device mps
 ========================================================================================
 """
 import argparse
@@ -156,7 +156,7 @@ def main():
         bar = "█" * int(score * 30)
         print(f"  #{rank}  {query:<45} : {score * 100:6.2f}%  {bar}")
     print("=" * 68)
-    print("\n[SUCCESS] Session 2 (Zero-Shot Video Search) demo completed.")
+    print("\n[SUCCESS] Session 4 (Zero-Shot Video Search) demo completed.")
 
 
 if __name__ == "__main__":

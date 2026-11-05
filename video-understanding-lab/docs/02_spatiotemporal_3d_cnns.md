@@ -1,4 +1,4 @@
-# Session 5: Spatio-Temporal 3D CNNs & Architectural Factorization
+# Session 2: Spatio-Temporal 3D CNNs & Architectural Factorization
 
 This guide provides an in-depth educational and mathematical walkthrough of **3D Convolutional Neural Networks (3D CNNs)** for video understanding. It covers full 3D convolutions ($R3D$), factorized $(2+1)\text{D}$ convolutions ($R(2+1)D$), mixed convolutions ($MC3$), and the historical **I3D Inflation Trick**.
 
@@ -196,7 +196,7 @@ tensor_bcthw = tensor_cthw.unsqueeze(0).to(device)
 
 ## 6. Empirical Benchmark on Apple Silicon M4 MPS
 
-Running `05_spatiotemporal_3d_cnns.py --model all --device mps` yields the following comparative benchmark:
+Running `02_spatiotemporal_3d_cnns.py --model all --device mps` yields the following comparative benchmark:
 
 | Model Architecture | Parameters | Kernel Formulation | Forward Latency (MPS) | Top-1 Action Prediction |
 | :--- | :--- | :--- | :--- | :--- |
@@ -215,17 +215,17 @@ Running `05_spatiotemporal_3d_cnns.py --model all --device mps` yields the follo
 ### Run R(2+1)D on Apple Silicon MPS:
 ```bash
 cd IF5152
-python video-understanding-lab/05_spatiotemporal_3d_cnns.py --model r2plus1d --device mps
+python video-understanding-lab/02_spatiotemporal_3d_cnns.py --model r2plus1d --device mps
 ```
 
 ### Inspect Detailed Layer Decompositions:
 ```bash
-python video-understanding-lab/05_spatiotemporal_3d_cnns.py --model r2plus1d --print-model
+python video-understanding-lab/02_spatiotemporal_3d_cnns.py --model r2plus1d --print-model
 ```
 
 ### Execute Head-to-Head Comparative Benchmark:
 ```bash
-python video-understanding-lab/05_spatiotemporal_3d_cnns.py --model all --device mps
+python video-understanding-lab/02_spatiotemporal_3d_cnns.py --model all --device mps
 ```
 
 ---

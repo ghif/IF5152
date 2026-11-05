@@ -32,18 +32,20 @@ cd video-understanding-lab
 # 3. Download demo media
 python download_samples.py
 
-# 4. Run Session 1 Demo (I/O & Late Fusion)
+# 4. Session 1: Video Tensors, I/O Bottlenecks & 2D Late Fusion
 python 01_video_io_and_late_fusion.py --device mps
 
-# 5. Run Session 1B Demo (3D CNNs & Factorization Benchmark)
-python 05_spatiotemporal_3d_cnns.py --model all --device mps
+# 5. Session 2: Spatio-Temporal 3D CNNs & Factorization Benchmark
+python 02_spatiotemporal_3d_cnns.py --model all --device mps
 
-# 6. Run Session 2 Demo (Video Transformer & Zero-Shot Search)
-python 02_video_transformer_inference.py --device mps
-python 03_zeroshot_video_search.py --device mps
+# 6. Session 3: Spatio-Temporal Vision Transformers (VideoMAE)
+python 03_video_transformer_inference.py --device mps
 
-# 7. Run Session 3 (Local Training on Apple M4 MPS)
-python 04_train_late_fusion_head.py --device mps --epochs 20
+# 7. Session 4: Open-Vocabulary Multimodal Video Search (CLIP)
+python 04_zeroshot_video_search.py --device mps
+
+# 8. Session 5: Local Training & Fine-Tuning on Apple M4 MPS
+python 05_train_temporal_head.py --device mps --epochs 20
 ```
 
 Refer to [`video-understanding-lab/README.md`](./video-understanding-lab/README.md) and the [`video-understanding-lab/docs/`](./video-understanding-lab/docs) directory for detailed self-study learning guides, theoretical derivations, and tensor dimensions.

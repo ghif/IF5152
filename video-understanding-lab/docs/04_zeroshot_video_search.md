@@ -1,6 +1,6 @@
-# Session 2 (Part B): Zero-Shot Video Search with Multimodal Foundation Models (CLIP)
+# Session 4: Zero-Shot Video Search with Multimodal Foundation Models (CLIP)
 
-- **File**: [`03_zeroshot_video_search.py`](../03_zeroshot_video_search.py)
+- **File**: [`04_zeroshot_video_search.py`](../04_zeroshot_video_search.py)
 - **Lecture Alignment**: IF5152 Week 11 (Multimodal Video-Language Understanding)
 - **Target Hardware**: Apple Silicon (`mps`), NVIDIA Cloud GPU (`cuda`), or CPU fallback (`cpu`)
 
@@ -171,7 +171,7 @@ Decoded 8 frames across the video duration.
   #6  a person applying facial makeup               :   0.00%  
 ====================================================================
 
-[SUCCESS] Session 2 (Zero-Shot Video Search) demo completed.
+[SUCCESS] Session 4 (Zero-Shot Video Search) demo completed.
 ```
 
 ### Key Takeaways:
@@ -183,7 +183,7 @@ Decoded 8 frames across the video duration.
 ## 6. Self-Study Exercises & Experiments
 
 ### Exercise 1: Fine-Grained Prompt Engineering
-1. Open [`03_zeroshot_video_search.py`](../03_zeroshot_video_search.py) in your editor.
+1. Open [`04_zeroshot_video_search.py`](../04_zeroshot_video_search.py) in your editor.
 2. Replace `DEFAULT_QUERIES` with competing plausible descriptions:
    ```python
    DEFAULT_QUERIES = [

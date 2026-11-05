@@ -1,7 +1,7 @@
 """
 ========================================================================================
-IF5152: Video Understanding - Session 5 Lab
-File: 05_spatiotemporal_3d_cnns.py
+IF5152: Video Understanding - Session 2 Lab
+File: 02_spatiotemporal_3d_cnns.py
 ========================================================================================
 
 PEDAGOGICAL & THEORETICAL FOUNDATIONS:
@@ -36,13 +36,13 @@ PEDAGOGICAL & THEORETICAL FOUNDATIONS:
 
 USAGE:
   # Run R(2+1)D on Apple Silicon MPS:
-  python 05_spatiotemporal_3d_cnns.py --model r2plus1d --device mps
+  python 02_spatiotemporal_3d_cnns.py --model r2plus1d --device mps
 
   # Run head-to-head architectural benchmark across all 3 variants:
-  python 05_spatiotemporal_3d_cnns.py --model all --device mps
+  python 02_spatiotemporal_3d_cnns.py --model all --device mps
 
   # Print model layer architecture breakdown:
-  python 05_spatiotemporal_3d_cnns.py --model r2plus1d --print-model
+  python 02_spatiotemporal_3d_cnns.py --model r2plus1d --print-model
 ========================================================================================
 """
 import argparse

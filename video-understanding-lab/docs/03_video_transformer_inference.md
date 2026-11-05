@@ -1,6 +1,6 @@
-# Session 2 (Part A): Spatio-Temporal Transformers & VideoMAE Foundation Models
+# Session 3: Spatio-Temporal Transformers & VideoMAE Foundation Models
 
-- **File**: [`02_video_transformer_inference.py`](../02_video_transformer_inference.py)
+- **File**: [`03_video_transformer_inference.py`](../03_video_transformer_inference.py)
 - **Lecture Alignment**: IF5152 Week 11 (Video Transformers & Foundation Models)
 - **Target Hardware**: Apple Silicon (`mps`), NVIDIA Cloud GPU (`cuda`), or CPU fallback (`cpu`)
 
@@ -149,7 +149,7 @@ Forward Pass Latency: 112.40 ms
   #5  riding scooter                 :  0.41%  
 ==================================================
 
-[SUCCESS] Session 2 (Video Transformer) demo completed.
+[SUCCESS] Session 3 (Video Transformer) demo completed.
 ```
 
 ### Key Takeaways:
@@ -169,7 +169,7 @@ VideoMAE was trained on 16-frame clips sampled at a specific stride.
 1. Place any 5–10 second video clip of an action (e.g. playing guitar, cooking, pushups) in `data/my_action.mp4`.
 2. Run:
    ```bash
-   python 02_video_transformer_inference.py --video data/my_action.mp4
+   python 03_video_transformer_inference.py --video data/my_action.mp4
    ```
 3. Check if the top-1 prediction matches the real-world action in the video.
 

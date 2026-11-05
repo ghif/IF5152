@@ -1,6 +1,6 @@
-# Session 3: Training & Fine-Tuning a Late Fusion Temporal Head on Apple Silicon M4 (MPS)
+# Session 5: Training & Fine-Tuning a Late Fusion Temporal Head on Apple Silicon M4 (MPS)
 
-- **File**: [`04_train_late_fusion_head.py`](../04_train_late_fusion_head.py)
+- **File**: [`05_train_temporal_head.py`](../05_train_temporal_head.py)
 - **Lecture Alignment**: IF5152 Week 11 (Late Fusion Head Training & Optimization)
 - **Target Hardware**: Apple Silicon (`mps`), NVIDIA Cloud GPU (`cuda`), or CPU fallback (`cpu`)
 
@@ -186,7 +186,7 @@ Class Name                Correct / Total    Accuracy
   BenchPress              : 4/4            100.0%  ████████████████████
 -------------------------------------------------------
 
-[SUCCESS] Session 3 (Training Late Fusion Head) completed.
+[SUCCESS] Session 5 (Training Late Fusion Head) completed.
 ```
 
 ### Key Performance Takeaways:
@@ -200,8 +200,8 @@ Class Name                Correct / Total    Accuracy
 ### Exercise 1: GRU vs Mean Pooling Ablation
 Run both models on the same split:
 ```bash
-python 04_train_late_fusion_head.py --fusion gru --epochs 20
-python 04_train_late_fusion_head.py --fusion mean --epochs 20
+python 05_train_temporal_head.py --fusion gru --epochs 20
+python 05_train_temporal_head.py --fusion mean --epochs 20
 ```
 - Compare the final validation accuracy and convergence speed.
 - On actions with distinct sequential stages (like `BaseballPitch` or `Basketball`), does the GRU achieve lower validation loss than Average Pooling?
@@ -209,7 +209,7 @@ python 04_train_late_fusion_head.py --fusion mean --epochs 20
 ### Exercise 2: Directional Sensitivity on Synthetic Motions
 Run training on the synthetic motion dataset:
 ```bash
-python 04_train_late_fusion_head.py --dataset synthetic --fusion gru --epochs 10
+python 05_train_temporal_head.py --dataset synthetic --fusion gru --epochs 10
 ```
 - Inspect how well the model separates `drift_right` from `drift_down` and `rotate_clockwise`.
 - Try inverting the temporal order of validation features (`features = torch.flip(features, dims=[1])`). Does the GRU detect the reversal?

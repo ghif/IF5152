@@ -1,31 +1,31 @@
 """
 ========================================================================================
-IF5152: Video Understanding - Session 2 Lab (Part A)
-File: 02_video_transformer_inference.py
+IF5152: Video Understanding - Session 3 Lab
+File: 03_video_transformer_inference.py
 ========================================================================================
 
 PEDAGOGICAL & THEORETICAL FOUNDATIONS:
 ----------------------------------------------------------------------------------------
-1. Lecture Slides 65-72: "Self-Attention in Spatio-Temporal Space"
+1. Self-Attention in Spatio-Temporal Space:
    - Convolutions have a local receptive field. To capture interactions between distant
-     regions in space and time, early methods used "Non-Local Blocks" (Slide 66-72).
+     regions in space and time, early methods used Non-Local Blocks.
 
-2. Lecture Slides 78-79: "Vision Transformers for Video (TimeSformer / VideoMAE)"
+2. Vision Transformers for Video (TimeSformer / VideoMAE):
    - ViT (Vision Transformer) applies self-attention over flattened 2D spatial patches.
    - For Video: A video clip of T frames is split into 3D "tubelet" patches (e.g., 2x16x16).
    - Problem: Full space-time self-attention across all tokens has quadratic complexity O(N^2),
      which is computationally prohibitive.
-   - Solution (Slide 78): "Divided Space-Time Attention" (TimeSformer) or Factorized Attention:
+   - Solution: "Divided Space-Time Attention" (TimeSformer) or Factorized Attention:
      First attend within each frame across SPACE, then attend across TIME for each patch!
 
-3. Industrial Perspective: "Foundation Models vs Training from Scratch"
+3. Industrial Perspective: Foundation Models vs Training from Scratch:
    - Training 3D CNNs or Video Transformers from scratch requires weeks of cluster compute.
    - In industry, teams fine-tune or run inference on pretrained Video Foundation Models
      (e.g., VideoMAE, TimeSformer, or MViTv2) pretrained on datasets like Kinetics-400.
 
 USAGE:
-  python 02_video_transformer_inference.py --video data/person_bicycle.mp4
-  python 02_video_transformer_inference.py --video data/person_bicycle.mp4 --device mps
+  python 03_video_transformer_inference.py --video data/person_bicycle.mp4
+  python 03_video_transformer_inference.py --video data/person_bicycle.mp4 --device mps
 ========================================================================================
 """
 import argparse
@@ -111,7 +111,7 @@ def main():
         bar = "█" * int(p.item() * 40)
         print(f"  #{rank}  {label_name:<30} : {p.item() * 100:5.2f}%  {bar}")
     print("==================================================")
-    print("\n[SUCCESS] Session 2 (Video Transformer) demo completed.")
+    print("\n[SUCCESS] Session 3 (Video Transformer) demo completed.")
 
 
 if __name__ == "__main__":
