@@ -52,21 +52,38 @@ flowchart TD
 
 #### 1. L2 Normalization onto the Unit Hypersphere $\mathbb{S}^{D-1}$
 For both visual frame embeddings $\mathbf{e}_t$ and text query embeddings $\mathbf{q}_i$:
-$$\hat{\mathbf{e}}_t = \frac{\mathbf{e}_t}{\|\mathbf{e}_t\|_2}, \quad \hat{\mathbf{q}}_i = \frac{\mathbf{q}_i}{\|\mathbf{q}_i\|_2} \in \mathbb{R}^{D}$$
+
+$$
+\hat{\mathbf{e}}_t = \frac{\mathbf{e}_t}{\|\mathbf{e}_t\|_2}, \quad \hat{\mathbf{q}}_i = \frac{\mathbf{q}_i}{\|\mathbf{q}_i\|_2} \in \mathbb{R}^{D}
+$$
+
 where $D = 512$ for `clip-vit-base-patch32`.
 
 #### 2. Temporal Embedding Aggregation
 We compute the temporal mean across all $T$ sampled frame vectors to obtain the video-level embedding:
-$$\bar{\mathbf{v}} = \frac{1}{T} \sum_{t=1}^T \hat{\mathbf{e}}_t$$
+
+$$
+\bar{\mathbf{v}} = \frac{1}{T} \sum_{t=1}^T \hat{\mathbf{e}}_t
+$$
+
 Followed by a second L2 normalization:
-$$\mathbf{v}_{\text{video}} = \frac{\bar{\mathbf{v}}}{\|\bar{\mathbf{v}}\|_2}$$
+
+$$
+\mathbf{v}_{\text{video}} = \frac{\bar{\mathbf{v}}}{\|\bar{\mathbf{v}}\|_2}
+$$
 
 #### 3. Metric Matching & Temperature Scaling
 The alignment between the video and text query $i$ is given by their inner product (cosine similarity):
-$$s_i = \langle \mathbf{v}_{\text{video}}, \hat{\mathbf{q}}_i \rangle = \mathbf{v}_{\text{video}} \cdot \hat{\mathbf{q}}_i^\top \in [-1, 1]$$
+
+$$
+s_i = \langle \mathbf{v}_{\text{video}}, \hat{\mathbf{q}}_i \rangle = \mathbf{v}_{\text{video}} \cdot \hat{\mathbf{q}}_i^\top \in [-1, 1]
+$$
 
 To produce a probability distribution over the candidate queries, we apply a temperature parameter $\tau$ (CLIP standard learned scale is approximately 100.0, or temperature $\tau = 0.01$):
-$$P(\text{Query } i \mid \text{Video}) = \frac{\exp(100.0 \cdot s_i)}{\sum_{j=1}^N \exp(100.0 \cdot s_j)}$$
+
+$$
+P(\text{Query } i \mid \text{Video}) = \frac{\exp(100.0 \cdot s_i)}{\sum_{j=1}^N \exp(100.0 \cdot s_j)}
+$$
 
 ---
 

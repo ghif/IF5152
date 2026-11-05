@@ -19,7 +19,11 @@ In this lab session, you will explore modern **Video Foundation Models**:
 
 ### The Space-Time Attention Challenge
 In a standard 2D Vision Transformer (ViT), an image is partitioned into $N = \frac{H}{P} \times \frac{W}{P}$ patches of size $P \times P$ (e.g., $16 \times 16$). Full self-attention requires:
-$$\text{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \text{Softmax}\left(\frac{\mathbf{Q} \mathbf{K}^\top}{\sqrt{d_k}}\right) \mathbf{V}$$
+
+$$
+\text{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \text{Softmax}\left(\frac{\mathbf{Q} \mathbf{K}^\top}{\sqrt{d_k}}\right) \mathbf{V}
+$$
+
 This incurs quadratic computational complexity $\mathcal{O}(N^2)$ and memory cost.
 
 When extended to a video of $T$ frames:
@@ -43,9 +47,16 @@ flowchart TD
 ### Divided Space-Time Attention
 To bypass the quadratic bottleneck, models like **TimeSformer** and **VideoMAE** factorize attention into two sequential steps within each transformer block:
 1. **Temporal Attention**: Each spatial patch attends *only* to patches at the same spatial coordinate across different time frames:
-   $$\mathcal{O}(N \cdot T^2)$$
+
+$$
+\mathcal{O}(N \cdot T^2)
+$$
+
 2. **Spatial Attention**: Tokens within the same frame attend to each other across spatial positions:
-   $$\mathcal{O}(T \cdot N^2)$$
+
+$$
+\mathcal{O}(T \cdot N^2)
+$$
 
 Total complexity drops from $\mathcal{O}(T^2 N^2)$ to $\mathcal{O}(T N^2 + N T^2)$, making deep video transformers computationally tractable.
 
@@ -53,8 +64,14 @@ Total complexity drops from $\mathcal{O}(T^2 N^2)$ to $\mathcal{O}(T N^2 + N T^2
 VideoMAE introduces a **3D Tubelet Embedding layer** (`Conv3d` with kernel size $2 \times 16 \times 16$):
 - It merges 2 consecutive temporal frames along with a $16 \times 16$ spatial patch into a single initial token.
 - For a 16-frame input clip at $224 \times 224$:
-  $$\text{Temporal Tokens} = \frac{16}{2} = 8, \quad \text{Spatial Tokens} = \left(\frac{224}{16}\right)^2 = 14 \times 14 = 196$$
-  $$\text{Total Tokens} = 8 \times 196 = 1,568 \text{ tokens}$$
+
+$$
+\text{Temporal Tokens} = \frac{16}{2} = 8, \quad \text{Spatial Tokens} = \left(\frac{224}{16}\right)^2 = 14 \times 14 = 196
+$$
+
+$$
+\text{Total Tokens} = 8 \times 196 = 1,568 \text{ tokens}
+$$
 
 ---
 

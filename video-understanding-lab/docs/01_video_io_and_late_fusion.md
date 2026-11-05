@@ -20,12 +20,21 @@ In this lab session, you will explore the transition from **2D static image clas
 
 ### 2.1 The Computational & Bandwidth Explosion
 While a standard image is a 3D tensor $[C \times H \times W]$, a video clip introduces a temporal dimension $T$:
-$$\mathbf{X} \in \mathbb{R}^{B \times T \times C \times H \times W}$$
+
+$$
+\mathbf{X} \in \mathbb{R}^{B \times T \times C \times H \times W}
+$$
 
 Consider the bandwidth of uncompressed raw video:
 * A standard $1080\text{p}$ video clip at 30 frames per second (FPS):
-  $$\text{Size per frame} = 1920 \times 1080 \times 3 \text{ bytes (RGB24)} \approx 6.22 \text{ MB}$$
-  $$\text{Data throughput} = 6.22 \text{ MB} \times 30 \text{ frames/sec} \approx 186.6 \text{ MB/second}$$
+
+$$
+\text{Size per frame} = 1920 \times 1080 \times 3 \text{ bytes (RGB24)} \approx 6.22 \text{ MB}
+$$
+
+$$
+\text{Data throughput} = 6.22 \text{ MB} \times 30 \text{ frames/sec} \approx 186.6 \text{ MB/second}
+$$
 * A 10-minute video clip in uncompressed RGB format would consume over **111 Gigabytes** of disk space!
 
 To make storage and internet streaming feasible, all real-world video files are heavily compressed using lossy video codecs (e.g., H.264/AVC, H.265/HEVC, VP9, AV1).
@@ -135,7 +144,11 @@ flowchart TD
 
 #### 3. Industrial Fast Seek via Demuxer Keyframe Navigation (`PyAV Fast Seek`):
 * Reads the MP4 container's index table to find the byte offset corresponding to the nearest preceding **I-frame** for each target Presentation Time Stamp (PTS):
-  $$\text{pts\_targets} = \text{linspace}(0, \text{duration}, T)$$
+
+$$
+\text{pts\_targets} = \text{linspace}(0, \text{duration}, T)
+$$
+
 * Executes `container.seek(pts, any_frame=False)` to jump the underlying disk file pointer directly to that byte offset, completely bypassing intermediate compressed packets.
 * Enables hardware slice/frame multithreading:
   ```python
@@ -162,14 +175,26 @@ flowchart TD
 
 #### Mathematical Steps in Preprocessing:
 1. **Color Space Conversion**: Video codecs compress video in **YUV420p** (luma/chroma subsampling). The decoder converts this to **RGB24** using the ITU-R BT.601/BT.709 color conversion matrix:
-   $$\begin{bmatrix} R \\ G \\ B \end{bmatrix} = \begin{bmatrix} 1 & 0 & 1.402 \\ 1 & -0.344136 & -0.714136 \\ 1 & 1.772 & 0 \end{bmatrix} \begin{bmatrix} Y \\ U - 128 \\ V - 128 \end{bmatrix}$$
+
+$$
+\begin{bmatrix} R \\ G \\ B \end{bmatrix} = \begin{bmatrix} 1 & 0 & 1.402 \\ 1 & -0.344136 & -0.714136 \\ 1 & 1.772 & 0 \end{bmatrix} \begin{bmatrix} Y \\ U - 128 \\ V - 128 \end{bmatrix}
+$$
+
 2. **Spatial Resizing**: Resizes spatial dimensions from arbitrary video resolution $(H_{\text{orig}}, W_{\text{orig}})$ to the model input resolution $(224 \times 224)$ via bilinear interpolation.
 3. **Channel Standardization**: Re-scales pixel values to $[0.0, 1.0]$ and applies standard ImageNet mean and standard deviation:
-   $$x_{\text{norm}}^{(c)} = \frac{x^{(c)} - \mu^{(c)}}{\sigma^{(c)}}, \quad \mu = [0.485, 0.456, 0.406], \; \sigma = [0.229, 0.224, 0.225]$$
+
+$$
+x_{\text{norm}}^{(c)} = \frac{x^{(c)} - \mu^{(c)}}{\sigma^{(c)}}, \quad \mu = [0.485, 0.456, 0.406], \; \sigma = [0.229, 0.224, 0.225]
+$$
+
 4. **The Batch Flattening Trick (Parallel Spatial Feature Extraction)**:
    A standard 2D CNN (e.g. MobileNetV3) expects a 4D image input `[Batch, C, H, W]`.
    Instead of using a Python for-loop over the $T=16$ time steps, we fold the temporal dimension into the batch dimension:
-   $$\mathbf{X}_{\text{flat}} = \mathbf{X}.\text{view}(B \cdot T, C, H, W) \in \mathbb{R}^{16 \times 3 \times 224 \times 224}$$
+
+$$
+\mathbf{X}_{\text{flat}} = \mathbf{X}.\mathrm{view}(B \cdot T, C, H, W) \in \mathbb{R}^{16 \times 3 \times 224 \times 224}
+$$
+
    This allows the GPU/MPS tensor cores to process all 16 frames **simultaneously in parallel**, achieving maximum hardware utilization.
 
 ---
@@ -193,14 +218,22 @@ flowchart TD
 
 ### Strategy A: Temporal Average Pooling
 Compresses the sequence into a single vector by computing the element-wise mean over time:
-$$\mathbf{z}_{\text{mean}} = \frac{1}{T} \sum_{t=1}^{T} \mathbf{h}_t \in \mathbb{R}^{D}$$
+
+$$
+\mathbf{z}_{\text{mean}} = \frac{1}{T} \sum_{t=1}^{T} \mathbf{h}_t \in \mathbb{R}^{D}
+$$
+
 * **Inductive Bias**: Permutation-invariant (shuffling video frames produces the exact same classification prediction).
 * **Pros**: Zero additional parameters, extremely fast, robust for static actions (e.g., *playing cello*, *sitting in classroom*).
 * **Cons**: Cannot distinguish irreversible directional actions (e.g., *opening a door* vs *closing a door*).
 
 ### Strategy B: Recurrent GRU Temporal Modeling
 Feeds the sequence of vectors into a Gated Recurrent Unit (GRU):
-$$\mathbf{s}_t = \text{GRU}(\mathbf{h}_t, \mathbf{s}_{t-1}), \quad \mathbf{z}_{\text{gru}} = \mathbf{s}_T \in \mathbb{R}^{d_h}$$
+
+$$
+\mathbf{s}_t = \mathrm{GRU}(\mathbf{h}_t, \mathbf{s}_{t-1}), \quad \mathbf{z}_{\text{gru}} = \mathbf{s}_T \in \mathbb{R}^{d_h}
+$$
+
 * **Inductive Bias**: Order-sensitive temporal dynamics.
 * **Pros**: Explicitly models sequential transitions and directionality.
 * **Cons**: Sequential computation across time steps; adds model parameters ($576 \times 256 \times 3 \approx 640\text{k}$ parameters).

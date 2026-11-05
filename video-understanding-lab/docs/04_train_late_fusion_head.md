@@ -24,18 +24,21 @@ When training on video datasets end-to-end, two major bottlenecks arise:
 
 ### The Solution: Feature Caching + Temporal Transfer Learning
 Because the spatial filters of a 2D backbone pretrained on ImageNet (such as MobileNetV3 or ResNet) already capture low-level textures, edges, and object semantics, we can **freeze the spatial backbone** $\theta_{\text{backbone}}$:
-$$\nabla_{\theta_{\text{backbone}}} \mathcal{L} = 0$$
+
+$$
+\nabla_{\theta_{\text{backbone}}} \mathcal{L} = 0
+$$
 
 ```mermaid
 flowchart TD
     subgraph OfflineCaching ["Step 1: One-Time Offline Feature Extraction (MPS)"]
-        V["Dataset Video Clips [N clips]"] --> Dec["PyAV Fast Keyframe Decode<br/>[T=16 frames]"]
+        V["Dataset Video Clips (N clips)"] --> Dec["PyAV Fast Keyframe Decode<br/>(T=16 frames)"]
         Dec --> BB["Frozen 2D CNN Backbone<br/>(MobileNetV3 on Apple M4 MPS)"]
-        BB --> Cache["Cached Feature Tensor<br/>Shape: [N, T=16, D=576] in RAM"]
+        BB --> Cache["Cached Feature Tensor<br/>Shape: (N, T=16, D=576) in RAM"]
     end
 
     subgraph TrainingLoop ["Step 2: Ultra-Fast Temporal Head Training (MPS)"]
-        Cache --> Batch["Mini-batch [B=8, 16, 576]"]
+        Cache --> Batch["Mini-batch (B=8, 16, 576)"]
         Batch --> Head["Trainable Head (GRU or Mean)"]
         Head --> Loss["CrossEntropyLoss"]
         Loss --> Opt["AdamW Optimizer (BPTT)<br/>~30ms / epoch on M4!"]
@@ -46,16 +49,34 @@ flowchart TD
 
 #### Option A: Recurrent Gated Recurrent Unit (GRU) Head
 Given a cached sequence of spatial embeddings $\mathbf{h}_{1:T} = [\mathbf{h}_1, \mathbf{h}_2, \dots, \mathbf{h}_T] \in \mathbb{R}^{T \times D}$:
-$$\mathbf{z}_t = \sigma(\mathbf{W}_z \mathbf{h}_t + \mathbf{U}_z \mathbf{s}_{t-1} + \mathbf{b}_z) \quad \text{(Update Gate)}$$
-$$\mathbf{r}_t = \sigma(\mathbf{W}_r \mathbf{h}_t + \mathbf{U}_r \mathbf{s}_{t-1} + \mathbf{b}_r) \quad \text{(Reset Gate)}$$
-$$\tilde{\mathbf{s}}_t = \tanh(\mathbf{W}_h \mathbf{h}_t + \mathbf{U}_h (\mathbf{r}_t \odot \mathbf{s}_{t-1}) + \mathbf{b}_h)$$
-$$\mathbf{s}_t = (1 - \mathbf{z}_t) \odot \mathbf{s}_{t-1} + \mathbf{z}_t \odot \tilde{\mathbf{s}}_t$$
+
+$$
+\mathbf{z}_t = \sigma(\mathbf{W}_z \mathbf{h}_t + \mathbf{U}_z \mathbf{s}_{t-1} + \mathbf{b}_z) \quad \text{(Update Gate)}
+$$
+
+$$
+\mathbf{r}_t = \sigma(\mathbf{W}_r \mathbf{h}_t + \mathbf{U}_r \mathbf{s}_{t-1} + \mathbf{b}_r) \quad \text{(Reset Gate)}
+$$
+
+$$
+\tilde{\mathbf{s}}_t = \tanh(\mathbf{W}_h \mathbf{h}_t + \mathbf{U}_h (\mathbf{r}_t \odot \mathbf{s}_{t-1}) + \mathbf{b}_h)
+$$
+
+$$
+\mathbf{s}_t = (1 - \mathbf{z}_t) \odot \mathbf{s}_{t-1} + \mathbf{z}_t \odot \tilde{\mathbf{s}}_t
+$$
 
 We pool the bidirectional hidden states across time and project to action class logits:
-$$\hat{\mathbf{y}} = \mathbf{W}_{\text{head}} \left(\frac{1}{T}\sum_{t=1}^T \mathbf{s}_t\right) + \mathbf{b}_{\text{head}} \in \mathbb{R}^K$$
+
+$$
+\hat{\mathbf{y}} = \mathbf{W}_{\text{head}} \left(\frac{1}{T}\sum_{t=1}^T \mathbf{s}_t\right) + \mathbf{b}_{\text{head}} \in \mathbb{R}^K
+$$
 
 #### Option B: Temporal Mean Pooling Head
-$$\bar{\mathbf{h}} = \frac{1}{T}\sum_{t=1}^T \mathbf{h}_t, \quad \hat{\mathbf{y}} = \mathbf{W}_{\text{head}} \bar{\mathbf{h}} + \mathbf{b}_{\text{head}}$$
+
+$$
+\bar{\mathbf{h}} = \frac{1}{T}\sum_{t=1}^T \mathbf{h}_t, \quad \hat{\mathbf{y}} = \mathbf{W}_{\text{head}} \bar{\mathbf{h}} + \mathbf{b}_{\text{head}}
+$$
 This baseline has zero recurrent parameters and serves as an order-invariant ablation benchmark.
 
 ---
