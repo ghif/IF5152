@@ -9,6 +9,7 @@ Welcome to the course repository for **IF5152 (Advanced Computer Vision)**. This
 
 | Module / Directory | Topic | Key Concepts | Hardware Support |
 | :--- | :--- | :--- | :--- |
+| **[`generative-models/`](./generative-models)** | **Generative Models (Lecture 13 & 14)** | Exact Likelihood (PixelCNN), Latent Failure Modes (Vanilla AE), ELBO & Reparameterization (VAE), Minimax Game (DCGAN), Iterative Denoising (DDPM) | Apple Silicon (MPS), NVIDIA GPU (CUDA), CPU |
 | **[`video-understanding-lab/`](./video-understanding-lab)** | **Video Understanding (Week 11)** | Video I/O bottlenecks, Late Fusion, Video Transformers (VideoMAE), Zero-Shot CLIP Search, Local M4 MPS Training | Apple Silicon (MPS), NVIDIA GPU (CUDA), CPU |
 
 ---
@@ -42,4 +43,4 @@ python 03_zeroshot_video_search.py --device mps
 python 04_train_late_fusion_head.py --device mps --epochs 20
 ```
 
-Refer to [`video-understanding-lab/README.md`](./video-understanding-lab/README.md) and the [`video-understanding-lab/docs/`](./video-understanding-lab/docs) directory for detailed self-study learning guides, theoretical derivations, tensor dimensions, and lecture slide mappings.
+Refer to [`video-understanding-lab/README.md`](./video-understanding-lab/README.md) and the [`video-understanding-lab/docs/`](./video-understanding-lab/docs) directory for detailed self-study learning guides, theoretical derivations, and tensor dimensions.

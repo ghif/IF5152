@@ -1,7 +1,7 @@
 # Session 3: Training & Fine-Tuning a Late Fusion Temporal Head on Apple Silicon M4 (MPS)
 
 - **File**: [`04_train_late_fusion_head.py`](../04_train_late_fusion_head.py)
-- **Lecture Alignment**: IF5152 Week 11 (Slides 18–20, 63)
+- **Lecture Alignment**: IF5152 Week 11 (Late Fusion Head Training & Optimization)
 - **Target Hardware**: Apple Silicon (`mps`), NVIDIA Cloud GPU (`cuda`), or CPU fallback (`cpu`)
 
 ---
@@ -44,7 +44,7 @@ flowchart TD
 
 ### Mathematical Formulation of Temporal Heads
 
-#### Option A: Recurrent Gated Recurrent Unit (GRU) Head (Slide 63)
+#### Option A: Recurrent Gated Recurrent Unit (GRU) Head
 Given a cached sequence of spatial embeddings $\mathbf{h}_{1:T} = [\mathbf{h}_1, \mathbf{h}_2, \dots, \mathbf{h}_T] \in \mathbb{R}^{T \times D}$:
 $$\mathbf{z}_t = \sigma(\mathbf{W}_z \mathbf{h}_t + \mathbf{U}_z \mathbf{s}_{t-1} + \mathbf{b}_z) \quad \text{(Update Gate)}$$
 $$\mathbf{r}_t = \sigma(\mathbf{W}_r \mathbf{h}_t + \mathbf{U}_r \mathbf{s}_{t-1} + \mathbf{b}_r) \quad \text{(Reset Gate)}$$
@@ -54,7 +54,7 @@ $$\mathbf{s}_t = (1 - \mathbf{z}_t) \odot \mathbf{s}_{t-1} + \mathbf{z}_t \odot 
 We pool the bidirectional hidden states across time and project to action class logits:
 $$\hat{\mathbf{y}} = \mathbf{W}_{\text{head}} \left(\frac{1}{T}\sum_{t=1}^T \mathbf{s}_t\right) + \mathbf{b}_{\text{head}} \in \mathbb{R}^K$$
 
-#### Option B: Temporal Mean Pooling Head (Slide 19)
+#### Option B: Temporal Mean Pooling Head
 $$\bar{\mathbf{h}} = \frac{1}{T}\sum_{t=1}^T \mathbf{h}_t, \quad \hat{\mathbf{y}} = \mathbf{W}_{\text{head}} \bar{\mathbf{h}} + \mathbf{b}_{\text{head}}$$
 This baseline has zero recurrent parameters and serves as an order-invariant ablation benchmark.
 

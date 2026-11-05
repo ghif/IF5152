@@ -38,12 +38,12 @@ IF5152/
 
 To enable students to learn autonomously, run the code independently, and deeply understand the theoretical and mathematical foundations, each script is accompanied by a dedicated Markdown companion guide:
 
-| Script | Companion Guide | Lecture Topics & Slides | Key Concepts Covered |
+| Script | Companion Guide | Core Topics | Key Concepts Covered |
 | :--- | :--- | :--- | :--- |
-| [`01_video_io_and_late_fusion.py`](01_video_io_and_late_fusion.py) | [**`docs/01_video_io_and_late_fusion.md`**](docs/01_video_io_and_late_fusion.md) | Slides 9–20, 63 | 5D Video Tensors (`[B, T, C, H, W]`), PyAV Keyframe Seeking benchmark, 2D CNN Backbones, Mean Pooling vs Recurrent GRU |
-| [`02_video_transformer_inference.py`](02_video_transformer_inference.py) | [**`docs/02_video_transformer_inference.md`**](docs/02_video_transformer_inference.md) | Slides 65–79 | Quadratic complexity of Space-Time Attention, Divided Attention (TimeSformer/VideoMAE), 3D Tubelet embeddings, Kinetics-400 |
-| [`03_zeroshot_video_search.py`](03_zeroshot_video_search.py) | [**`docs/03_zeroshot_video_search.md`**](docs/03_zeroshot_video_search.md) | Slides 99–105 | Closed-set limits vs Open-vocabulary search, Dual-encoder multimodal matching (CLIP), Unit hypersphere normalization, Vector DB search |
-| [`04_train_late_fusion_head.py`](04_train_late_fusion_head.py) | [**`docs/04_train_late_fusion_head.md`**](docs/04_train_late_fusion_head.md) | Slides 18–20, 63 | Local training on Apple Silicon M4 MPS, Feature caching, Backpropagation Through Time (BPTT), Recurrent GRU vs Mean Pooling |
+| [`01_video_io_and_late_fusion.py`](01_video_io_and_late_fusion.py) | [**`docs/01_video_io_and_late_fusion.md`**](docs/01_video_io_and_late_fusion.md) | Video Tensors & Late Fusion | 5D Video Tensors (`[B, T, C, H, W]`), PyAV Keyframe Seeking benchmark, 2D CNN Backbones, Mean Pooling vs Recurrent GRU |
+| [`02_video_transformer_inference.py`](02_video_transformer_inference.py) | [**`docs/02_video_transformer_inference.md`**](docs/02_video_transformer_inference.md) | Spatio-Temporal Attention & VideoMAE | Quadratic complexity of Space-Time Attention, Divided Attention (TimeSformer/VideoMAE), 3D Tubelet embeddings, Kinetics-400 |
+| [`03_zeroshot_video_search.py`](03_zeroshot_video_search.py) | [**`docs/03_zeroshot_video_search.md`**](docs/03_zeroshot_video_search.md) | Multimodal Video-Language & CLIP | Closed-set limits vs Open-vocabulary search, Dual-encoder multimodal matching (CLIP), Unit hypersphere normalization, Vector DB search |
+| [`04_train_late_fusion_head.py`](04_train_late_fusion_head.py) | [**`docs/04_train_late_fusion_head.md`**](docs/04_train_late_fusion_head.md) | Temporal Head Training & Optimization | Local training on Apple Silicon M4 MPS, Feature caching, Backpropagation Through Time (BPTT), Recurrent GRU vs Mean Pooling |
 
 *Each companion guide includes theoretical derivations, Mermaid architecture flowcharts, tensor dimension tracing tables, execution playbooks, expected outputs, self-study exercises, and troubleshooting tips.*
 
@@ -79,15 +79,15 @@ python download_samples.py
 ## 🎓 Curriculum & Live Demo Walkthrough
 
 ### Session 1: Video Tensors, The I/O Bottleneck & Late Fusion
-* **Reference Slides**: Slides 1–55 (Video = 2D + Time, Single-Frame CNN, Early/Late Fusion, 3D Conv).
+* **Core Topics**: Video Fundamentals, Single-Frame CNN, Early/Late Fusion, 3D Conv.
 * **Self-Study Guide**: 📖 [Detailed Notes & Theory Guide](docs/01_video_io_and_late_fusion.md)
 * **Industrial Reality**: Decoding video frames is a major CPU-bound bottleneck in production pipelines. Simple 2D backbone feature extraction with temporal pooling provides a strong, low-latency baseline.
 * **Run Demo**:
   ```bash
-  # Mean pooling (Slide 19)
+  # Mean pooling
   python 01_video_io_and_late_fusion.py --fusion mean
 
-  # Recurrent temporal head (Slide 63)
+  # Recurrent temporal head
   python 01_video_io_and_late_fusion.py --fusion gru
 
   # Explicit device selection (auto | mps | cuda | cpu)
@@ -97,7 +97,7 @@ python download_samples.py
 ---
 
 ### Session 2: Video Transformers & Zero-Shot Video-Language Matching
-* **Reference Slides**: Slides 56–105 (Non-Local Blocks, Space-Time Transformers, Untrimmed Video, Multimodal Audio-Visual).
+* **Core Topics**: Non-Local Blocks, Space-Time Transformers, Untrimmed Video, Multimodal Audio-Visual.
 * **Self-Study Guides**:
   * 📖 [VideoMAE Pretrained Transformer Guide](docs/02_video_transformer_inference.md)
   * 📖 [Zero-Shot Multimodal Search (CLIP) Guide](docs/03_zeroshot_video_search.md)
@@ -117,7 +117,7 @@ python download_samples.py
 ---
 
 ### Session 3: Local Training & Fine-Tuning on Apple Silicon M4 (MPS)
-* **Reference Slides**: Slides 18–20, 63 (Backpropagation Through Time, Late Temporal Fusion).
+* **Core Topics**: Backpropagation Through Time, Late Temporal Fusion Training.
 * **Self-Study Guide**: 📖 [Local Training & MPS Acceleration Guide](docs/04_train_late_fusion_head.md)
 * **Industrial Reality**: Decompressing video frames repeatedly during training is a massive CPU bottleneck. We precompute spatial features on the M4 GPU once, allowing the recurrent GRU head to train at **~30 milliseconds per epoch**!
 * **Run Training**:

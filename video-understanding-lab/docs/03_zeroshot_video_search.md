@@ -1,7 +1,7 @@
 # Session 2 (Part B): Zero-Shot Video Search with Multimodal Foundation Models (CLIP)
 
 - **File**: [`03_zeroshot_video_search.py`](../03_zeroshot_video_search.py)
-- **Lecture Alignment**: IF5152 Week 11 (Slides 99–105)
+- **Lecture Alignment**: IF5152 Week 11 (Multimodal Video-Language Understanding)
 - **Target Hardware**: Apple Silicon (`mps`), NVIDIA Cloud GPU (`cuda`), or CPU fallback (`cpu`)
 
 ---
@@ -17,7 +17,7 @@ In this lab session, you will explore **Multimodal Open-Vocabulary Video Underst
 
 ## 2. Theoretical Background & Mathematical Foundations
 
-### Closed-Set Bottleneck vs Open-Vocabulary (Slides 99–101)
+### Closed-Set Bottleneck vs Open-Vocabulary
 Traditional video models (like Session 2's VideoMAE) are **closed-set**:
 - They classify inputs into a pre-defined fixed label set $\mathcal{Y} = \{1, 2, \dots, K\}$ (e.g. $K=400$ Kinetics classes).
 - If a user searches for an action not explicitly present in the training vocabulary (e.g., *"a person fixing a punctured bicycle tire on the pavement"*), closed-set classifiers are fundamentally incapable of recognizing it.
@@ -178,7 +178,7 @@ Decoded 8 frames across the video duration.
    ```
 3. Run the script. Notice how CLIP evaluates semantic nuances between different activities involving the same object (bicycle).
 
-### Exercise 2: Temporal Binding Limits (Slide 104)
+### Exercise 2: Temporal Binding Limits
 - **Question**: Because this script aggregates frame embeddings via average pooling ($\frac{1}{T}\sum \hat{\mathbf{e}}_t$), can the model distinguish between *"a person getting onto a bicycle"* versus *"a person getting off a bicycle"*?
 - **Experiment**: Test this limitation by adding those two prompts to `DEFAULT_QUERIES`. What architectural upgrade would be required to enforce temporal directionality (e.g., temporal cross-attention or X-CLIP)?
 

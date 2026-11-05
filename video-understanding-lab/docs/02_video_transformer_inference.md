@@ -1,7 +1,7 @@
 # Session 2 (Part A): Spatio-Temporal Transformers & VideoMAE Foundation Models
 
 - **File**: [`02_video_transformer_inference.py`](../02_video_transformer_inference.py)
-- **Lecture Alignment**: IF5152 Week 11 (Slides 65–79)
+- **Lecture Alignment**: IF5152 Week 11 (Video Transformers & Foundation Models)
 - **Target Hardware**: Apple Silicon (`mps`), NVIDIA Cloud GPU (`cuda`), or CPU fallback (`cpu`)
 
 ---
@@ -17,7 +17,7 @@ In this lab session, you will explore modern **Video Foundation Models**:
 
 ## 2. Theoretical Background & Mathematical Foundations
 
-### The Space-Time Attention Challenge (Slides 65–72)
+### The Space-Time Attention Challenge
 In a standard 2D Vision Transformer (ViT), an image is partitioned into $N = \frac{H}{P} \times \frac{W}{P}$ patches of size $P \times P$ (e.g., $16 \times 16$). Full self-attention requires:
 $$\text{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \text{Softmax}\left(\frac{\mathbf{Q} \mathbf{K}^\top}{\sqrt{d_k}}\right) \mathbf{V}$$
 This incurs quadratic computational complexity $\mathcal{O}(N^2)$ and memory cost.
@@ -40,7 +40,7 @@ flowchart TD
     Cls --> Head["Linear Head -> 400 Kinetics Action Classes"]
 ```
 
-### Divided Space-Time Attention (Slide 78)
+### Divided Space-Time Attention
 To bypass the quadratic bottleneck, models like **TimeSformer** and **VideoMAE** factorize attention into two sequential steps within each transformer block:
 1. **Temporal Attention**: Each spatial patch attends *only* to patches at the same spatial coordinate across different time frames:
    $$\mathcal{O}(N \cdot T^2)$$
@@ -49,7 +49,7 @@ To bypass the quadratic bottleneck, models like **TimeSformer** and **VideoMAE**
 
 Total complexity drops from $\mathcal{O}(T^2 N^2)$ to $\mathcal{O}(T N^2 + N T^2)$, making deep video transformers computationally tractable.
 
-### VideoMAE & 3D Tubelet Embedding (Slide 79)
+### VideoMAE & 3D Tubelet Embedding
 VideoMAE introduces a **3D Tubelet Embedding layer** (`Conv3d` with kernel size $2 \times 16 \times 16$):
 - It merges 2 consecutive temporal frames along with a $16 \times 16$ spatial patch into a single initial token.
 - For a 16-frame input clip at $224 \times 224$:

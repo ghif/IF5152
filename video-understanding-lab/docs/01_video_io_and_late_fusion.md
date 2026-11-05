@@ -1,7 +1,7 @@
 # Session 1: Video I/O Bottlenecks, Spatial Backbones, and Late Fusion
 
 - **File**: [`01_video_io_and_late_fusion.py`](../01_video_io_and_late_fusion.py)
-- **Lecture Alignment**: IF5152 Week 11 (Slides 9–20, 63)
+- **Lecture Alignment**: IF5152 Week 11 (Video Understanding Foundations & Late Fusion)
 - **Target Hardware**: Apple Silicon (`mps`), NVIDIA Cloud GPU (`cuda`), or CPU fallback (`cpu`)
 
 ---
@@ -11,13 +11,13 @@
 In this lab session, you will explore the transition from **2D image classification** to **spatio-temporal video understanding**:
 1. **The I/O Decoding Bottleneck**: Why traditional video decoding (e.g., standard frame-by-frame loops) severely throttles deep learning pipelines, and how multi-threaded keyframe seeking solves it.
 2. **5D Video Tensor Mechanics**: How video clips are represented in PyTorch as `[Batch, Time, Channels, Height, Width]`.
-3. **Late Fusion Paradigms**: Comparing order-invariant **Average Pooling** (Slide 19) against order-aware **Recurrent GRU Modeling** (Slide 63) atop an ImageNet-pretrained 2D CNN backbone.
+3. **Late Fusion Paradigms**: Comparing order-invariant **Average Pooling** against order-aware **Recurrent GRU Modeling** atop an ImageNet-pretrained 2D CNN backbone.
 
 ---
 
 ## 2. Theoretical Background & Mathematical Foundations
 
-### Video Representation: 2D Space + 1D Time (Slide 9)
+### Video Representation: 2D Space + 1D Time
 While a standard image is a 3D tensor $[C \times H \times W]$, a video clip introduces a temporal dimension $T$:
 $$\mathbf{X} \in \mathbb{R}^{B \times T \times C \times H \times W}$$
 where:
@@ -26,9 +26,9 @@ where:
 - $C$: Number of color channels (3 for RGB)
 - $H, W$: Spatial resolution (e.g., $224 \times 224$)
 
-Processing every single frame of a 30 FPS high-definition video through a deep neural network is computationally infeasible. Therefore, we sample short clips of $T$ frames uniformly across the video duration (Slides 14–16).
+Processing every single frame of a 30 FPS high-definition video through a deep neural network is computationally infeasible. Therefore, we sample short clips of $T$ frames uniformly across the video duration.
 
-### Late Fusion Architectures (Slides 18–20)
+### Late Fusion Architectures
 Instead of processing frames in complete isolation (Single-Frame baseline), **Late Fusion** first passes each frame through a shared 2D CNN feature extractor $f_\theta(\cdot)$, yielding spatial embeddings:
 $$\mathbf{h}_t = f_\theta(\mathbf{x}_t) \in \mathbb{R}^{D}, \quad t = 1, \dots, T$$
 
@@ -47,14 +47,14 @@ flowchart TD
     M2 --> C2["Linear Head -> 10 Classes"]
 ```
 
-#### Strategy A: Temporal Average Pooling (Slide 19)
+#### Strategy A: Temporal Average Pooling
 Compresses the sequence into a single vector by computing the element-wise mean over time:
 $$\mathbf{z}_{\text{mean}} = \frac{1}{T} \sum_{t=1}^{T} \mathbf{h}_t \in \mathbb{R}^{D}$$
 - **Inductive Bias**: Permutation-invariant (shuffling video frames produces the exact same classification prediction).
 - **Pros**: Zero additional parameters, extremely fast, robust for static scenes.
 - **Cons**: Cannot distinguish irreversible directional actions (e.g., *opening a door* vs *closing a door*).
 
-#### Strategy B: Recurrent GRU Temporal Modeling (Slide 63)
+#### Strategy B: Recurrent GRU Temporal Modeling
 Feeds the sequence of vectors into a Gated Recurrent Unit (GRU):
 $$\mathbf{s}_t = \text{GRU}(\mathbf{h}_t, \mathbf{s}_{t-1}), \quad \mathbf{z}_{\text{gru}} = \mathbf{s}_T \in \mathbb{R}^{d_h}$$
 - **Inductive Bias**: Order-sensitive temporal dynamics.
