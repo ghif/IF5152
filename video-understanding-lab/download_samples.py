@@ -19,6 +19,8 @@ from utils import resolve_data_path
 SAMPLES = {
     # Outdoor surveillance clip featuring people, bicycles, and moving cars
     "person_bicycle.mp4": "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/person-bicycle-car-detection.mp4",
+    # Official Kinetics-400 test video asset (Action: using segway, YouTube ID: SOX5yA1l24A)
+    "kinetics_segway.mp4": "https://raw.githubusercontent.com/pytorch/vision/main/test/assets/videos/SOX5yA1l24A.mp4",
 }
 
 

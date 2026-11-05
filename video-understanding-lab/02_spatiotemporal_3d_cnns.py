@@ -33,9 +33,10 @@ PEDAGOGICAL & THEORETICAL FOUNDATIONS:
    - Torchvision 3D CNNs expect: [Batch, Channels, Time, Height, Width] -> [B, C, T, H, W]
      (Note contrast with Hugging Face VideoMAE which expects [B, T, C, H, W]).
    - Standard Kinetics-400 resolution: 112 x 112 with 16 frames.
+   - Default Benchmark Video: data/kinetics_segway.mp4 (Kinetics-400 test set clip, action: 'using segway')
 
 USAGE:
-  # Run R(2+1)D on Apple Silicon MPS:
+  # Run R(2+1)D on Kinetics-400 test clip using Apple Silicon MPS:
   python 02_spatiotemporal_3d_cnns.py --model r2plus1d --device mps
 
   # Run head-to-head architectural benchmark across all 3 variants:
@@ -203,8 +204,8 @@ def main():
     parser.add_argument(
         "--video",
         type=str,
-        default="data/person_bicycle.mp4",
-        help="Path to input video file (defaults to data/person_bicycle.mp4)"
+        default="data/kinetics_segway.mp4",
+        help="Path to input video file (defaults to official Kinetics-400 test clip: data/kinetics_segway.mp4)"
     )
     parser.add_argument(
         "--model",
