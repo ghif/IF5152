@@ -18,7 +18,7 @@ In this lab session, you will explore modern **Video Foundation Models**:
 ## 2. Theoretical Background & Mathematical Foundations
 
 ### The Space-Time Attention Challenge
-In a standard 2D Vision Transformer (ViT), an image is partitioned into $N = \frac{H}{P} \times \frac{W}{P}$ patches of size $P \times P$ (e.g., $16 \times 16$). Full self-attention requires:
+In a standard 2D Vision Transformer (ViT; see [Dosovitskiy et al., ICLR 2021](https://arxiv.org/abs/2010.11929)), an image is partitioned into $N = \frac{H}{P} \times \frac{W}{P}$ patches of size $P \times P$ (e.g., $16 \times 16$). Full self-attention requires:
 
 $$
 \text{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \text{Softmax}\left(\frac{\mathbf{Q} \mathbf{K}^\top}{\sqrt{d_k}}\right) \mathbf{V}
@@ -45,7 +45,7 @@ flowchart TD
 ```
 
 ### Divided Space-Time Attention
-To bypass the quadratic bottleneck, models like **TimeSformer** and **VideoMAE** factorize attention into two sequential steps within each transformer block:
+To bypass the quadratic bottleneck, models like **TimeSformer** ([Bertasius et al., ICML 2021](https://arxiv.org/abs/2102.05095)), **ViViT** ([Arnab et al., ICCV 2021](https://arxiv.org/abs/2103.15691)), and **VideoMAE** factorize attention into two sequential steps within each transformer block:
 1. **Temporal Attention**: Each spatial patch attends *only* to patches at the same spatial coordinate across different time frames:
 
 $$
@@ -61,7 +61,7 @@ $$
 Total complexity drops from $\mathcal{O}(T^2 N^2)$ to $\mathcal{O}(T N^2 + N T^2)$, making deep video transformers computationally tractable.
 
 ### VideoMAE & 3D Tubelet Embedding
-VideoMAE introduces a **3D Tubelet Embedding layer** (`Conv3d` with kernel size $2 \times 16 \times 16$):
+VideoMAE ([Tong et al., NeurIPS 2022](https://arxiv.org/abs/2203.12608); extending Masked Autoencoders by [He et al., CVPR 2022](https://arxiv.org/abs/2111.06377) to video) introduces a **3D Tubelet Embedding layer** (`Conv3d` with kernel size $2 \times 16 \times 16$):
 - It merges 2 consecutive temporal frames along with a $16 \times 16$ spatial patch into a single initial token.
 - For a 16-frame input clip at $224 \times 224$:
 
@@ -183,3 +183,27 @@ VideoMAE was trained on 16-frame clips sampled at a specific stride.
   - This is normal when loading checkpoints if certain auxiliary pre-training heads are stripped for classification.
 - **Out of Memory (OOM) on GPU**:
   - Video transformers are memory-intensive (~86M parameters). If running on a GPU with < 4GB VRAM, pass `--device cpu`.
+
+---
+
+## 📚 References & Canonical Literature
+
+1. **Vision Transformer (ViT)**:
+   - Dosovitskiy, A., Beyer, L., Kolesnikov, A., Weissenborn, D., Zhai, X., Unterthiner, T., Dehghani, M., Minderer, M., Heigold, G., Gelly, S., Uszkoreit, J., & Houlsby, N. (2021). *An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale*. ICLR 2021.
+   - Paper: [arXiv:2010.11929](https://arxiv.org/abs/2010.11929)
+2. **TimeSformer (Divided Space-Time Attention)**:
+   - Bertasius, G., Wang, H., & Torresani, L. (2021). *Is Space-Time Attention All You Need for Video Understanding?*. ICML 2021.
+   - Paper: [arXiv:2102.05095](https://arxiv.org/abs/2102.05095)
+3. **ViViT (Video Vision Transformer)**:
+   - Arnab, A., Dehghani, M., Heigold, G., Sun, C., Lučić, M., & Schmid, C. (2021). *ViViT: A Video Vision Transformer*. ICCV 2021.
+   - Paper: [arXiv:2103.15691](https://arxiv.org/abs/2103.15691)
+4. **Masked Autoencoders (MAE)**:
+   - He, K., Chen, X., Xie, S., Li, Y., Dollár, P., & Girshick, R. (2022). *Masked Autoencoders Are Scalable Vision Learners*. CVPR 2022.
+   - Paper: [arXiv:2111.06377](https://arxiv.org/abs/2111.06377)
+5. **VideoMAE (Masked Autoencoders for Video)**:
+   - Tong, Z., Song, Y., Wang, J., & Wang, L. (2022). *VideoMAE: Masked Autoencoders are Data-Efficient Learners for Self-Supervised Video Pre-Training*. NeurIPS 2022.
+   - Paper: [arXiv:2203.12602](https://arxiv.org/abs/2203.12602)
+6. **The Kinetics Human Action Video Dataset**:
+   - Kay, W., Carreira, J., Simonyan, K., Zhang, B., Hillier, C., Rao, S., ... & Zisserman, A. (2017). *The Kinetics Human Action Video Dataset*.
+   - Paper: [arXiv:1705.06950](https://arxiv.org/abs/1705.06950)
+

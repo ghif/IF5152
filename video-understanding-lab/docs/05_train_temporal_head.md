@@ -9,9 +9,9 @@
 ## 1. Pedagogical Objective
 
 In this lab session, you will train a deep video action recognition model locally on your own machine:
-1. **The Industrial Reality of Video Training**: Why training 3D CNNs or Video Transformers from scratch is impractical for edge devices/laptops, and how **feature caching + temporal head fine-tuning** provides an ultra-fast, industrial-grade training paradigm.
-2. **Backpropagation Through Time (BPTT)**: How gradients propagate backwards through a recurrent **Gated Recurrent Unit (GRU)** temporal head across video frames.
-3. **Apple Silicon M4 MPS Acceleration**: Leveraging PyTorch Metal Performance Shaders and Unified Memory Architecture (UMA) to train models in **fractions of a second per epoch**.
+1. **The Industrial Reality of Video Training**: Why training 3D CNNs or Video Transformers from scratch is impractical for edge devices/laptops, and how **feature caching + temporal head fine-tuning** ([Sharif Razavian et al., 2014](https://arxiv.org/abs/1403.6382)) provides an ultra-fast, industrial-grade training paradigm.
+2. **Backpropagation Through Time (BPTT)**: How gradients propagate backwards through a recurrent **Gated Recurrent Unit ([GRU; Cho et al., 2014](https://arxiv.org/abs/1406.1078))** temporal head across video frames ([Werbos, 1990](https://ieeexplore.ieee.org/document/58337)).
+3. **Apple Silicon M4 MPS Acceleration**: Leveraging PyTorch [Metal Performance Shaders (MPS)](https://developer.apple.com/metal/pytorch/) and Unified Memory Architecture (UMA) to train models in **fractions of a second per epoch**.
 
 ---
 
@@ -23,7 +23,7 @@ When training on video datasets end-to-end, two major bottlenecks arise:
 2. **Activation Memory Footprint**: Keeping intermediate feature maps for $T$ frames across all 2D/3D convolutional layers in VRAM during backpropagation quickly causes Out-Of-Memory (OOM) errors.
 
 ### The Solution: Feature Caching + Temporal Transfer Learning
-Because the spatial filters of a 2D backbone pretrained on ImageNet (such as MobileNetV3 or ResNet) already capture low-level textures, edges, and object semantics, we can **freeze the spatial backbone** $\theta_{\text{backbone}}$:
+Because the spatial filters of a 2D backbone pretrained on ImageNet ([Deng et al., 2009](https://ieeexplore.ieee.org/document/5206848)) (such as [MobileNetV3; Howard et al., 2019](https://arxiv.org/abs/1905.02244) or [ResNet; He et al., 2016](https://arxiv.org/abs/1512.03385)) already capture low-level textures, edges, and object semantics, we can **freeze the spatial backbone** $\theta_{\text{backbone}}$ ([Sharif Razavian et al., 2014](https://arxiv.org/abs/1403.6382)):
 
 $$
 \nabla_{\theta_{\text{backbone}}} \mathcal{L} = 0
@@ -48,7 +48,7 @@ flowchart TD
 ### Mathematical Formulation of Temporal Heads
 
 #### Option A: Recurrent Gated Recurrent Unit (GRU) Head
-Given a cached sequence of spatial embeddings $\mathbf{h}_{1:T} = [\mathbf{h}_1, \mathbf{h}_2, \dots, \mathbf{h}_T] \in \mathbb{R}^{T \times D}$:
+Given a cached sequence of spatial embeddings $\mathbf{h}_{1:T} = [\mathbf{h}_1, \mathbf{h}_2, \dots, \mathbf{h}_T] \in \mathbb{R}^{T \times D}$, the [GRU](https://arxiv.org/abs/1406.1078) updates hidden state vectors sequentially via [Backpropagation Through Time](https://ieeexplore.ieee.org/document/58337):
 
 $$
 \mathbf{z}_t = \sigma(\mathbf{W}_z \mathbf{h}_t + \mathbf{U}_z \mathbf{s}_{t-1} + \mathbf{b}_z) \quad \text{(Update Gate)}
@@ -98,21 +98,21 @@ This baseline has zero recurrent parameters and serves as an order-invariant abl
 
 ## 4. Execution Playbook
 
-### 1. Fast Training on Apple Silicon M4 (Default: UCF-101 5-Class Subset)
+### 1. Fast Training on Apple Silicon M4 (Default: [UCF-101; Soomro et al., 2012](https://arxiv.org/abs/1212.0402) 5-Class Subset)
 ```bash
-python 04_train_late_fusion_head.py --device mps --epochs 20 --fusion gru
+python 05_train_temporal_head.py --device mps --epochs 20 --fusion gru
 ```
 *Automatically streams and extracts 5 classes (`ApplyEyeMakeup`, `BaseballPitch`, `Basketball`, `BenchPress`, `BandMarching`) on first run.*
 
 ### 2. Ablation: Comparing with Temporal Mean Pooling Baseline
 ```bash
-python 04_train_late_fusion_head.py --device mps --epochs 20 --fusion mean
+python 05_train_temporal_head.py --device mps --epochs 20 --fusion mean
 ```
 
 ### 3. 100% Offline Test: Synthetic Motion Generator (Zero Download)
 If running without internet access, use the built-in synthetic motion dataset generator:
 ```bash
-python 04_train_late_fusion_head.py --dataset synthetic --device mps --epochs 10
+python 05_train_temporal_head.py --dataset synthetic --device mps --epochs 10
 ```
 
 ### CLI Arguments Reference
@@ -123,7 +123,7 @@ python 04_train_late_fusion_head.py --dataset synthetic --device mps --epochs 10
 | `--fusion` | `str` | `gru` | Head architecture: `gru` (recurrent) or `mean` (pooling) |
 | `--epochs` | `int` | `20` | Total training epochs |
 | `--batch_size` | `int` | `8` | Mini-batch size for temporal training |
-| `--lr` | `float` | `0.001` | Learning rate for AdamW |
+| `--lr` | `float` | `0.001` | Learning rate for [AdamW (Loshchilov & Hutter, 2019)](https://arxiv.org/abs/1711.05101) |
 | `--hidden_dim` | `int` | `128` | Hidden units in GRU head |
 | `--num_frames` | `int` | `16` | Sampled frames per video clip |
 | `--clips_per_class` | `int` | `12` | Number of video clips per action class |
@@ -224,3 +224,32 @@ python 05_train_temporal_head.py --dataset synthetic --fusion gru --epochs 10
   - In modern PyTorch ($\ge 2.0$), GRU has full native MPS support. If you are on an older PyTorch build, export `PYTORCH_ENABLE_MPS_FALLBACK=1` in your terminal.
 - **Checkpoints directory**:
   - Best model weights are automatically saved to `checkpoints/best_head_<fusion>.pt`. You can load them later with `torch.load()`.
+
+---
+
+## 📚 References & Canonical Literature
+
+1. **Backpropagation Through Time (BPTT)**:
+   - Werbos, P. J. (1990). *Backpropagation through time: what it does and how to do it*. Proceedings of the IEEE, 78(10), 1550-1560.
+   - Paper: [IEEE Xplore: 10.1109/5.58337](https://ieeexplore.ieee.org/document/58337)
+2. **Gated Recurrent Unit (GRU)**:
+   - Cho, K., van Merriënboer, B., Gulcehre, C., Bahdanau, D., Bougares, F., Schwenk, H., & Bengio, Y. (2014). *Learning Phrase Representations using RNN Encoder-Decoder for Statistical Machine Translation*. EMNLP 2014.
+   - Paper: [arXiv:1406.1078](https://arxiv.org/abs/1406.1078)
+   - Chung, J., Gulcehre, C., Cho, K., & Bengio, Y. (2014). *Empirical Evaluation of Gated Recurrent Neural Networks on Sequence Modeling*. NeurIPS 2014 Workshop on Deep Learning.
+   - Paper: [arXiv:1412.3555](https://arxiv.org/abs/1412.3555)
+3. **CNN Features Off-the-Shelf for Transfer Learning**:
+   - Sharif Razavian, A., Azizpour, H., Sullivan, J., & Carlsson, S. (2014). *CNN Features off-the-shelf: an Astounding Baseline for Recognition*. CVPR Workshops 2014.
+   - Paper: [arXiv:1403.6382](https://arxiv.org/abs/1403.6382)
+4. **MobileNetV3**:
+   - Howard, A., Sandler, M., Chu, G., Chen, L. C., Chen, B., Tan, M., Wang, W., Zhu, Y., Pang, R., Vasudevan, V., Le, Q. V., & Adam, H. (2019). *Searching for MobileNetV3*. ICCV 2019.
+   - Paper: [arXiv:1905.02244](https://arxiv.org/abs/1905.02244)
+5. **AdamW Optimization (Decoupled Weight Decay)**:
+   - Loshchilov, I., & Hutter, F. (2019). *Decoupled Weight Decay Regularization*. ICLR 2019.
+   - Paper: [arXiv:1711.05101](https://arxiv.org/abs/1711.05101)
+6. **UCF101 Action Recognition Benchmark**:
+   - Soomro, K., Roshan Zamir, A., & Shah, M. (2012). *UCF101: A Dataset of 101 Human Actions Classes From Videos in The Wild*. Center for Research in Computer Vision (CRCV-TR-12-01).
+   - Paper: [arXiv:1212.0402](https://arxiv.org/abs/1212.0402)
+7. **Apple Silicon PyTorch Acceleration (MPS)**:
+   - Apple Inc. (2022). *Accelerated PyTorch training on Mac with Metal Performance Shaders*.
+   - Guide: [Apple Developer Documentation](https://developer.apple.com/metal/pytorch/)
+

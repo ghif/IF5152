@@ -23,7 +23,7 @@ Traditional video models (like Session 2's VideoMAE) are **closed-set**:
 - If a user searches for an action not explicitly present in the training vocabulary (e.g., *"a person fixing a punctured bicycle tire on the pavement"*), closed-set classifiers are fundamentally incapable of recognizing it.
 
 ### Dual-Encoder Vision-Language Alignment (CLIP)
-Contrastive Language-Image Pre-training (CLIP) trains a Vision Encoder $f_v(\cdot)$ and a Text Encoder $f_t(\cdot)$ simultaneously using a symmetric contrastive loss on hundreds of millions of web image-text pairs:
+Contrastive Language-Image Pre-training ([CLIP; Radford et al., 2021](https://arxiv.org/abs/2103.00020)) trains a Vision Encoder $f_v(\cdot)$ and a Text Encoder $f_t(\cdot)$ simultaneously using a symmetric contrastive [InfoNCE loss](https://arxiv.org/abs/1807.03748) ([van den Oord et al., 2018](https://arxiv.org/abs/1807.03748)) on hundreds of millions of web image-text pairs:
 
 ```mermaid
 flowchart TD
@@ -176,7 +176,7 @@ Decoded 8 frames across the video duration.
 
 ### Key Takeaways:
 1. **Zero-Shot Adaptability**: The model was never explicitly trained on a classification category named *"a person riding a bicycle outdoors"*. It inferred this through shared cross-modal geometric alignment.
-2. **Industrial Scalability**: You can query millions of video clips in real time simply by pre-computing and indexing the 512-dimensional video vectors $\mathbf{v}_{\text{video}}$ inside a vector database (e.g. Milvus, FAISS, Pinecone) and computing fast dot products.
+2. **Industrial Scalability**: You can query millions of video clips in real time simply by pre-computing and indexing the 512-dimensional video vectors $\mathbf{v}_{\text{video}}$ inside a vector database (e.g. Milvus, [FAISS; Johnson et al., 2019](https://arxiv.org/abs/1702.08734), Pinecone) and computing fast dot products.
 
 ---
 
@@ -197,7 +197,7 @@ Decoded 8 frames across the video duration.
 
 ### Exercise 2: Temporal Binding Limits
 - **Question**: Because this script aggregates frame embeddings via average pooling ($\frac{1}{T}\sum \hat{\mathbf{e}}_t$), can the model distinguish between *"a person getting onto a bicycle"* versus *"a person getting off a bicycle"*?
-- **Experiment**: Test this limitation by adding those two prompts to `DEFAULT_QUERIES`. What architectural upgrade would be required to enforce temporal directionality (e.g., temporal cross-attention or X-CLIP)?
+- **Experiment**: Test this limitation by adding those two prompts to `DEFAULT_QUERIES`. What architectural upgrade would be required to enforce temporal directionality (e.g., temporal cross-attention in [CLIP4Clip; Luo et al., 2022](https://arxiv.org/abs/2104.08865), [ActionCLIP; Wang et al., 2021](https://arxiv.org/abs/2109.08472), or [X-CLIP; Ni et al., 2022](https://arxiv.org/abs/2208.02816))?
 
 ---
 
@@ -209,3 +209,27 @@ Decoded 8 frames across the video duration.
   - Text encoding takes only ~2–3 ms. Frame decoding and visual ViT encoding represent >90% of execution time.
 - **Memory footprint**:
   - ViT-B/32 requires ~600 MB of VRAM. It fits comfortably on standard laptops and Google Colab free tier.
+
+---
+
+## 📚 References & Canonical Literature
+
+1. **CLIP (Contrastive Language-Image Pre-Training)**:
+   - Radford, A., Kim, J. W., Hallacy, C., Ramesh, A., Goh, G., Agarwal, S., Sastry, G., Askell, A., Mishkin, P., Clark, J., Krueger, G., & Sutskever, I. (2021). *Learning Transferable Visual Models From Natural Language Supervision*. ICML 2021.
+   - Paper: [arXiv:2103.00020](https://arxiv.org/abs/2103.00020)
+2. **Contrastive Predictive Coding (InfoNCE Loss)**:
+   - van den Oord, A., Li, Y., & Vinyals, O. (2018). *Representation Learning with Contrastive Predictive Coding*.
+   - Paper: [arXiv:1807.03748](https://arxiv.org/abs/1807.03748)
+3. **CLIP4Clip (Video-Text Retrieval)**:
+   - Luo, H., Ji, L., Zhong, M., Chen, Y., Lei, W., Duan, N., & Li, T. (2022). *CLIP4Clip: An Empirical Study of CLIP for End to End Video Clip Retrieval*. Neurocomputing 2022.
+   - Paper: [arXiv:2104.08865](https://arxiv.org/abs/2104.08865)
+4. **ActionCLIP (Multimodal Action Recognition)**:
+   - Wang, M., Xing, J., & Liu, Y. (2021). *ActionCLIP: A New Paradigm for Video Action Recognition*.
+   - Paper: [arXiv:2109.08472](https://arxiv.org/abs/2109.08472)
+5. **X-CLIP (Cross-Modal Video Recognition)**:
+   - Ni, B., Peng, H., Chen, M., Zhang, S., Meng, G., Du, J., Xiang, Z., & Ling, H. (2022). *Expanding Language-Image Pretrained Models for General Video Recognition*. ECCV 2022.
+   - Paper: [arXiv:2208.02816](https://arxiv.org/abs/2208.02816)
+6. **Billion-Scale Vector Similarity Search (FAISS)**:
+   - Johnson, J., Douze, M., & Jégou, H. (2019). *Billion-scale similarity search with GPUs*. IEEE Transactions on Big Data.
+   - Paper: [arXiv:1702.08734](https://arxiv.org/abs/1702.08734)
+

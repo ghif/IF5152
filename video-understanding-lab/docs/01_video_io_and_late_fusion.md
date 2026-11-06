@@ -37,7 +37,7 @@ $$
 $$
 * A 10-minute video clip in uncompressed RGB format would consume over **111 Gigabytes** of disk space!
 
-To make storage and internet streaming feasible, all real-world video files are heavily compressed using lossy video codecs (e.g., H.264/AVC, H.265/HEVC, VP9, AV1).
+To make storage and internet streaming feasible, all real-world video files are heavily compressed using lossy video codecs (e.g., H.264/AVC ([Wiegand et al., IEEE TCSVT 2003](https://ieeexplore.ieee.org/document/1218189)), H.265/HEVC ([Sullivan et al., IEEE TCSVT 2012](https://ieeexplore.ieee.org/document/6316136)), VP9, AV1).
 
 ---
 
@@ -93,7 +93,7 @@ Because B-frames require future reference frames to decode, video codecs transmi
 ---
 
 ### 2.4 Why Video I/O is the #1 Bottleneck in Deep Learning
-When training neural networks on image datasets (e.g., ImageNet), reading a JPEG image from disk takes $\sim 1\text{ ms}$.
+When training neural networks on image datasets (e.g., ImageNet, [Deng et al., CVPR 2009](https://ieeexplore.ieee.org/document/5206848)), reading a JPEG image from disk takes $\sim 1\text{ ms}$.
 However, when training on video clips:
 * An epoch requires sampling thousands of video clips.
 * If a model needs 16 frames uniformly spaced across a 600-frame video, how should those frames be retrieved?
@@ -188,7 +188,7 @@ x_{\text{norm}}^{(c)} = \frac{x^{(c)} - \mu^{(c)}}{\sigma^{(c)}}, \quad \mu = [0
 $$
 
 4. **The Batch Flattening Trick (Parallel Spatial Feature Extraction)**:
-   A standard 2D CNN (e.g. MobileNetV3) expects a 4D image input `[Batch, C, H, W]`.
+   A standard 2D CNN (e.g. MobileNetV3 ([Howard et al., ICCV 2019](https://arxiv.org/abs/1905.02244)) or ResNet ([He et al., CVPR 2016](https://arxiv.org/abs/1512.03385))) expects a 4D image input `[Batch, C, H, W]`.
    Instead of using a Python for-loop over the $T=16$ time steps, we fold the temporal dimension into the batch dimension:
 
 $$
@@ -201,7 +201,7 @@ $$
 
 ## 3. Late Fusion Architectures
 
-Once spatial feature vectors $\mathbf{h}_t \in \mathbb{R}^{576}$ are extracted for each frame $t = 1, \dots, T$, we unflatten the tensor back to `[B, T, D]` and aggregate temporal information before classification:
+In their seminal study on large-scale video classification, [Karpathy et al. (CVPR 2014)](https://cs.stanford.edu/people/karpathy/deepvideo/) established that combining frame-level representations via late temporal fusion provides a strong, computationally efficient baseline. Once spatial feature vectors $\mathbf{h}_t \in \mathbb{R}^{576}$ are extracted for each frame $t = 1, \dots, T$, we unflatten the tensor back to `[B, T, D]` and aggregate temporal information before classification:
 
 ```mermaid
 flowchart TD
@@ -228,7 +228,7 @@ $$
 * **Cons**: Cannot distinguish irreversible directional actions (e.g., *opening a door* vs *closing a door*).
 
 ### Strategy B: Recurrent GRU Temporal Modeling
-Feeds the sequence of vectors into a Gated Recurrent Unit (GRU):
+Feeds the sequence of vectors into a Gated Recurrent Unit (GRU) ([Cho et al., EMNLP 2014](https://arxiv.org/abs/1406.1078); see also Long-term Recurrent Convolutional Networks by [Donahue et al., CVPR 2015](https://arxiv.org/abs/1411.4389)):
 
 $$
 \mathbf{s}_t = \mathrm{GRU}(\mathbf{h}_t, \mathbf{s}_{t-1}), \quad \mathbf{z}_{\text{gru}} = \mathbf{s}_T \in \mathbb{R}^{d_h}
@@ -368,3 +368,24 @@ Test the script with `--num_frames 8`, `--num_frames 16`, and `--num_frames 32`:
   * This is an informational macOS dynamic linker warning caused when both OpenCV and PyAV bundle FFmpeg dylibs. It does not affect execution or numerical correctness.
 * **MPS Out-of-Memory or Unsupported Op Warning**:
   * If running on an older macOS version without full MPS support, pass `--device cpu` to verify functionality.
+
+---
+
+## 📚 References & Canonical Literature
+
+1. **Video Compression & Codec Standards:**
+   - Wiegand, T., Sullivan, G. J., Bjøntegaard, G., & Luthra, A. (2003). "Overview of the H.264/AVC Video Coding Standard". *IEEE Transactions on Circuits and Systems for Video Technology (TCSVT)*, 13(7), 560–576. [IEEE Xplore](https://ieeexplore.ieee.org/document/1218189)
+   - Sullivan, G. J., Ohm, J. R., Han, W. J., & Wiegand, T. (2012). "Overview of the High Efficiency Video Coding (HEVC) Standard". *IEEE Transactions on Circuits and Systems for Video Technology (TCSVT)*, 22(12), 1649–1668. [IEEE Xplore](https://ieeexplore.ieee.org/document/6316136)
+
+2. **Large-Scale Video Classification & Late Fusion:**
+   - Karpathy, A., Toderici, G., Shetty, S., Leung, T., Sukthankar, R., & Fei-Fei, L. (2014). "Large-scale Video Classification with Convolutional Neural Networks". *IEEE Conference on Computer Vision and Pattern Recognition (CVPR 2014)*, 1725–1732. [Paper Link](https://cs.stanford.edu/people/karpathy/deepvideo/)
+
+3. **2D Deep Backbone Architectures & Datasets:**
+   - Deng, J., Dong, W., Socher, R., Li, L.-J., Li, K., & Fei-Fei, L. (2009). "ImageNet: A Large-Scale Hierarchical Image Database". *IEEE Conference on Computer Vision and Pattern Recognition (CVPR 2009)*. [IEEE Xplore](https://ieeexplore.ieee.org/document/5206848)
+   - He, K., Zhang, X., Ren, S., & Sun, J. (2016). "Deep Residual Learning for Image Recognition". *IEEE Conference on Computer Vision and Pattern Recognition (CVPR 2016)*. [https://arxiv.org/abs/1512.03385](https://arxiv.org/abs/1512.03385)
+   - Howard, A., et al. (2019). "Searching for MobileNetV3". *IEEE/CVF International Conference on Computer Vision (ICCV 2019)*. [https://arxiv.org/abs/1905.02244](https://arxiv.org/abs/1905.02244)
+
+4. **Recurrent Spatio-Temporal Modeling:**
+   - Cho, K., van Merriënboer, B., Gulcehre, C., Bahdanau, D., Bougares, F., Schwenk, H., & Bengio, Y. (2014). "Learning Phrase Representations using RNN Encoder-Decoder for Statistical Machine Translation". *Conference on Empirical Methods in Natural Language Processing (EMNLP 2014)*. [https://arxiv.org/abs/1406.1078](https://arxiv.org/abs/1406.1078)
+   - Donahue, J., Anne Hendricks, L., Guadarrama, S., Rohrbach, M., Venugopalan, S., Saenko, K., & Darrell, T. (2015). "Long-term Recurrent Convolutional Networks for Visual Recognition and Description". *IEEE Conference on Computer Vision and Pattern Recognition (CVPR 2015)*. [https://arxiv.org/abs/1411.4389](https://arxiv.org/abs/1411.4389)
+

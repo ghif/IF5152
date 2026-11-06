@@ -211,7 +211,7 @@ def main():
         "--model",
         type=str,
         choices=["r3d", "r2plus1d", "mc3", "all"],
-        default="r2plus1d",
+        default="all",
         help="3D CNN architecture to run ('r3d', 'r2plus1d', 'mc3', or 'all' for comparative benchmark)"
     )
     parser.add_argument(

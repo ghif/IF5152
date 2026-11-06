@@ -1,6 +1,6 @@
 # Session 2: Spatio-Temporal 3D CNNs & Architectural Factorization
 
-This guide provides an in-depth educational and mathematical walkthrough of **3D Convolutional Neural Networks (3D CNNs)** for video understanding. It covers full 3D convolutions ($R3D$), factorized $(2+1)\text{D}$ convolutions ($R(2+1)D$), mixed convolutions ($MC3$), and the historical **I3D Inflation Trick**.
+This guide provides an in-depth educational and mathematical walkthrough of **3D Convolutional Neural Networks (3D CNNs)** for video understanding (originally pioneered by [Ji et al., IEEE TPAMI 2013](https://ieeexplore.ieee.org/document/6165309) and [Tran et al., C3D, ICCV 2015](https://arxiv.org/abs/1412.0767)). It covers full 3D convolutions ($R3D$), factorized $(2+1)\text{D}$ convolutions ($R(2+1)D$, [Tran et al., CVPR 2018](https://arxiv.org/abs/1711.11248)), mixed convolutions ($MC3$), and the historical **I3D Inflation Trick** ([Carreira & Zisserman, CVPR 2017](https://arxiv.org/abs/1705.07750)).
 
 ---
 
@@ -65,7 +65,7 @@ While standard 3D CNNs ($R3D$, $C3D$) are conceptually straightforward, they suf
 1. **Parameter Explosion & Overfitting**: A $3 \times 3 \times 3$ kernel contains $27$ parameters per channel pair, compared to only $9$ for a $3 \times 3$ 2D filter ($3\times$ increase).
 2. **Optimization Difficulty**: Full 3D networks are notoriously difficult to train from scratch on small action datasets.
 
-This led researchers (Tran et al., CVPR 2018) to formulate factorized and hybrid variations:
+This led researchers ([Tran et al., CVPR 2018](https://arxiv.org/abs/1711.11248); [Xie et al., S3D, ECCV 2018](https://arxiv.org/abs/1712.04851)) to formulate factorized and hybrid variations:
 
 ```mermaid
 flowchart TD
@@ -133,9 +133,9 @@ Mixed Convolution builds on the empirical observation that **motion signals are 
 
 ---
 
-## 4. The I3D "Inflation Trick" (Carreira & Zisserman, CVPR 2017)
+## 4. The I3D "Inflation Trick" ([Carreira & Zisserman, CVPR 2017](https://arxiv.org/abs/1705.07750))
 
-Before large-scale video datasets like Kinetics were available, training 3D CNNs from scratch was hampered by severe overfitting. Carreira & Zisserman introduced the **Inflated 3D ConvNet (I3D)** trick:
+Before large-scale video datasets like Kinetics-400 ([Kay et al., 2017](https://arxiv.org/abs/1705.06950)) were available, training 3D CNNs from scratch was hampered by severe overfitting. Carreira & Zisserman introduced the **Inflated 3D ConvNet (I3D)** trick:
 
 How do you bootstrap successful 2D ImageNet weights into a 3D video network?
 
@@ -242,3 +242,23 @@ python video-understanding-lab/02_spatiotemporal_3d_cnns.py --model all --device
    Using the formula in Section 3.2, compute the exact parameter savings when $C_{\text{in}} = 256$ and $C_{\text{out}} = 512$.
 3. **The Inflation Test**:
    Why is dividing by $N$ (the temporal filter length) essential during I3D weight inflation? What would happen to the magnitude of the activations if we simply replicated the 2D filter without scaling?
+
+---
+
+## 📚 References & Canonical Literature
+
+1. **Foundations of 3D Spatio-Temporal Convolutions:**
+   - Ji, S., Xu, W., Yang, M., & Yu, K. (2013). "3D Convolutional Neural Networks for Human Action Recognition". *IEEE Transactions on Pattern Analysis and Machine Intelligence (TPAMI)*, 35(1), 221–231. [IEEE Xplore](https://ieeexplore.ieee.org/document/6165309)
+   - Tran, D., Bourdev, L., Fergus, R., Torresani, L., & Paluri, M. (2015). "Learning Spatiotemporal Features with 3D Convolutional Networks". *IEEE International Conference on Computer Vision (ICCV 2015)*. [https://arxiv.org/abs/1412.0767](https://arxiv.org/abs/1412.0767)
+
+2. **The Inflated 3D ConvNet (I3D) & Kinetics Benchmark:**
+   - Carreira, J., & Zisserman, A. (2017). "Quo Vadis, Action Recognition? A New Model and the Kinetics Dataset". *IEEE Conference on Computer Vision and Pattern Recognition (CVPR 2017)*. [https://arxiv.org/abs/1705.07750](https://arxiv.org/abs/1705.07750)
+   - Kay, W., Carreira, J., Simonyan, K., Zhang, B., Hillier, C., Vijayanarasimhan, S., Viola, F., Green, T., Back, T., Natsev, P., Suleyman, M., & Zisserman, A. (2017). "The Kinetics Human Action Video Dataset". *arXiv:1705.06950*. [https://arxiv.org/abs/1705.06950](https://arxiv.org/abs/1705.06950)
+
+3. **Factorized Spatio-Temporal Convolutions:**
+   - Tran, D., Wang, H., Torresani, L., Ray, J., LeCun, Y., & Paluri, M. (2018). "A Closer Look at Spatiotemporal Convolutions for Action Recognition". *IEEE Conference on Computer Vision and Pattern Recognition (CVPR 2018)*. [https://arxiv.org/abs/1711.11248](https://arxiv.org/abs/1711.11248)
+   - Xie, S., Sun, C., Huang, J., Tu, Z., & Murphy, K. (2018). "Rethinking Spatiotemporal Structuring for Video Recognition". *European Conference on Computer Vision (ECCV 2018)*. [https://arxiv.org/abs/1712.04851](https://arxiv.org/abs/1712.04851)
+
+4. **Multi-Rate Temporal Modeling:**
+   - Feichtenhofer, C., Fan, H., Malik, J., & He, K. (2019). "SlowFast Networks for Video Recognition". *IEEE/CVF International Conference on Computer Vision (ICCV 2019)*. [https://arxiv.org/abs/1812.03982](https://arxiv.org/abs/1812.03982)
+
