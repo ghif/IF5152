@@ -165,11 +165,6 @@ python download_samples.py
   python 05_train_temporal_head.py --dataset synthetic --device mps --epochs 10
   ```
 
-  **3. 100% Offline Test with Synthetic Motion Generator:**
-  ```bash
-  python 04_train_late_fusion_head.py --dataset synthetic --device mps --epochs 10
-  ```
-
 ---
 
 ## ☁️ Running on Google Colab CLI / Cloud GPU
@@ -182,6 +177,8 @@ nvidia-smi
 
 # Run scripts with automatic CUDA detection
 python 01_video_io_and_late_fusion.py --device cuda
-python 02_video_transformer_inference.py --device cuda
-python 03_zeroshot_video_search.py --device cuda
+python 02_spatiotemporal_3d_cnns.py --model all --device cuda
+python 03_video_transformer_inference.py --device cuda
+python 04_zeroshot_video_search.py --device cuda
+python 05_train_temporal_head.py --device cuda --epochs 20
 ```

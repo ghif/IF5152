@@ -174,7 +174,7 @@ flowchart TD
 ```
 
 #### Mathematical Steps in Preprocessing:
-1. **Color Space Conversion**: Video codecs compress video in **YUV420p** (luma/chroma subsampling). The decoder converts this to **RGB24** using the ITU-R BT.601/BT.709 color conversion matrix:
+1. **Color Space Conversion**: Video codecs compress video in **YUV420p** (luma/chroma subsampling). The decoder converts this to **RGB24** using the ITU-R BT.601 (full-range JFIF) color conversion matrix (or ITU-R BT.709 for HD content):
 
 $$
 \begin{bmatrix} R \\ G \\ B \end{bmatrix} = \begin{bmatrix} 1 & 0 & 1.402 \\ 1 & -0.344136 & -0.714136 \\ 1 & 1.772 & 0 \end{bmatrix} \begin{bmatrix} Y \\ U - 128 \\ V - 128 \end{bmatrix}
@@ -236,7 +236,7 @@ $$
 
 * **Inductive Bias**: Order-sensitive temporal dynamics.
 * **Pros**: Explicitly models sequential transitions and directionality.
-* **Cons**: Sequential computation across time steps; adds model parameters ($576 \times 256 \times 3 \approx 640\text{k}$ parameters).
+* **Cons**: Sequential computation across time steps; adds model parameters ($3 \times 256 \times (576 + 256 + 2) = 640,512 \approx 640.5\text{k}$ parameters across the 3 GRU gates for input-to-hidden $D=576$, hidden-to-hidden $d_h=256$, and bias terms).
 
 ---
 

@@ -18,7 +18,7 @@ In this lab session, you will explore **Multimodal Open-Vocabulary Video Underst
 ## 2. Theoretical Background & Mathematical Foundations
 
 ### Closed-Set Bottleneck vs Open-Vocabulary
-Traditional video models (like Session 2's VideoMAE) are **closed-set**:
+Traditional video models (like Session 3's VideoMAE) are **closed-set**:
 - They classify inputs into a pre-defined fixed label set $\mathcal{Y} = \{1, 2, \dots, K\}$ (e.g. $K=400$ Kinetics classes).
 - If a user searches for an action not explicitly present in the training vocabulary (e.g., *"a person fixing a punctured bicycle tire on the pavement"*), closed-set classifiers are fundamentally incapable of recognizing it.
 
@@ -109,19 +109,19 @@ $$
 
 ### Running Default Open-Vocabulary Search
 ```bash
-python 03_zeroshot_video_search.py --video data/person_bicycle.mp4
+python 04_zeroshot_video_search.py --video data/person_bicycle.mp4
 ```
 
 ### Specifying Hardware Accelerators
 ```bash
 # Apple Silicon Mac
-python 03_zeroshot_video_search.py --video data/person_bicycle.mp4 --device mps
+python 04_zeroshot_video_search.py --video data/person_bicycle.mp4 --device mps
 
 # NVIDIA Cloud GPU
-python 03_zeroshot_video_search.py --video data/person_bicycle.mp4 --device cuda
+python 04_zeroshot_video_search.py --video data/person_bicycle.mp4 --device cuda
 
 # CPU fallback
-python 03_zeroshot_video_search.py --video data/person_bicycle.mp4 --device cpu
+python 04_zeroshot_video_search.py --video data/person_bicycle.mp4 --device cpu
 ```
 
 ### CLI Arguments Reference
@@ -197,7 +197,7 @@ Decoded 8 frames across the video duration.
 
 ### Exercise 2: Temporal Binding Limits
 - **Question**: Because this script aggregates frame embeddings via average pooling ($\frac{1}{T}\sum \hat{\mathbf{e}}_t$), can the model distinguish between *"a person getting onto a bicycle"* versus *"a person getting off a bicycle"*?
-- **Experiment**: Test this limitation by adding those two prompts to `DEFAULT_QUERIES`. What architectural upgrade would be required to enforce temporal directionality (e.g., temporal cross-attention in [CLIP4Clip; Luo et al., 2022](https://arxiv.org/abs/2104.08865), [ActionCLIP; Wang et al., 2021](https://arxiv.org/abs/2109.08472), or [X-CLIP; Ni et al., 2022](https://arxiv.org/abs/2208.02816))?
+- **Experiment**: Test this limitation by adding those two prompts to `DEFAULT_QUERIES`. What architectural upgrade would be required to enforce temporal directionality (e.g., temporal similarity/transformer aggregation in [CLIP4Clip; Luo et al., 2022](https://arxiv.org/abs/2104.08860), [ActionCLIP; Wang et al., 2021](https://arxiv.org/abs/2109.08472), or [X-CLIP; Ni et al., 2022](https://arxiv.org/abs/2208.02816))?
 
 ---
 
@@ -222,7 +222,7 @@ Decoded 8 frames across the video duration.
    - Paper: [arXiv:1807.03748](https://arxiv.org/abs/1807.03748)
 3. **CLIP4Clip (Video-Text Retrieval)**:
    - Luo, H., Ji, L., Zhong, M., Chen, Y., Lei, W., Duan, N., & Li, T. (2022). *CLIP4Clip: An Empirical Study of CLIP for End to End Video Clip Retrieval*. Neurocomputing 2022.
-   - Paper: [arXiv:2104.08865](https://arxiv.org/abs/2104.08865)
+   - Paper: [arXiv:2104.08860](https://arxiv.org/abs/2104.08860)
 4. **ActionCLIP (Multimodal Action Recognition)**:
    - Wang, M., Xing, J., & Liu, Y. (2021). *ActionCLIP: A New Paradigm for Video Action Recognition*.
    - Paper: [arXiv:2109.08472](https://arxiv.org/abs/2109.08472)

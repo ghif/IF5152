@@ -88,7 +88,7 @@ def sample_frame_indices(total_frames: int, num_frames: int) -> np.ndarray:
     Uniform Temporal Subsampling:
       Selects `num_frames` evenly spaced frame indices across the full video duration.
       
-    Mathematical Intuition (Lecture Slide 14-16: Training on Clips):
+    Mathematical Intuition (Training on Clips):
       Videos are typically recorded at 24-60 fps. Passing every single frame into
       a neural network would blow up computation and VRAM. Instead, models sample
       a small number of frames (e.g., T=8 or T=16) with uniform temporal stride.

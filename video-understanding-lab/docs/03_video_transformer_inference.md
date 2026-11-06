@@ -32,38 +32,40 @@ When extended to a video of $T$ frames:
 
 ```mermaid
 flowchart TD
-    V["Raw Video: T Frames"] --> Tub["3D Tubelet Patch Embedding<br/>Tube size: (2 x 16 x 16)"]
-    Tub --> Tok["Sequence of Spatio-Temporal Tokens"]
-    Tok --> TA["Divided Space-Time Attention Blocks"]
-    subgraph AttentionBlock ["Transformer Layer"]
-        TA1["1. Temporal Attention: Attend across Time for fixed spatial patch"]
-        TA2["2. Spatial Attention: Attend across Space for fixed time step"]
-        TA1 --> TA2
+    V["Raw Video: T=16 Frames"] --> Tub["3D Cube / Tubelet Patch Embedding<br/>Conv3d kernel=(2, 16, 16), stride=(2, 16, 16)"]
+    Tub --> Tok["Sequence of 1,568 Spatio-Temporal Tokens"]
+    Tok --> TA["Transformer Encoder Blocks (12 Layers)"]
+    subgraph AttentionBlock ["Space-Time Self-Attention Paradigms"]
+        TA1["Factorized / Divided Attention (TimeSformer, ViViT):<br/>Temporal Attention O(N*T^2) -> Spatial Attention O(T*N^2)"]
+        TA2["Joint Space-Time Attention (VideoMAE):<br/>Global Self-Attention O((T*N)^2) with 90% Tube Masking in Pre-Training"]
     end
-    TA --> Cls["[CLS] Token Output Representation"]
-    Cls --> Head["Linear Head -> 400 Kinetics Action Classes"]
+    TA --> Pool["Global Sequence Mean Pooling (fc_norm)"]
+    Pool --> Head["Linear Head -> 400 Kinetics Action Classes"]
 ```
 
-### Divided Space-Time Attention
-To bypass the quadratic bottleneck, models like **TimeSformer** ([Bertasius et al., ICML 2021](https://arxiv.org/abs/2102.05095)), **ViViT** ([Arnab et al., ICCV 2021](https://arxiv.org/abs/2103.15691)), and **VideoMAE** factorize attention into two sequential steps within each transformer block:
-1. **Temporal Attention**: Each spatial patch attends *only* to patches at the same spatial coordinate across different time frames:
+### Factorized (Divided) vs. Joint Space-Time Attention
+To scale Vision Transformers to video, two prominent architectural paradigms have emerged:
+
+1. **Divided (Factorized) Space-Time Attention** — used in **TimeSformer** ([Bertasius et al., ICML 2021](https://arxiv.org/abs/2102.05095)) and **ViViT** ([Arnab et al., ICCV 2021](https://arxiv.org/abs/2103.15691)):
+   Factorizes attention into two sequential steps within each transformer block:
+   - **Temporal Attention**: Each spatial patch attends *only* to patches at the same spatial coordinate across different time frames:
 
 $$
 \mathcal{O}(N \cdot T^2)
 $$
 
-2. **Spatial Attention**: Tokens within the same frame attend to each other across spatial positions:
+   - **Spatial Attention**: Tokens within the same frame attend to each other across spatial positions:
 
 $$
 \mathcal{O}(T \cdot N^2)
 $$
 
-Total complexity drops from $\mathcal{O}(T^2 N^2)$ to $\mathcal{O}(T N^2 + N T^2)$, making deep video transformers computationally tractable.
+   Total complexity drops from $\mathcal{O}(T^2 N^2)$ to $\mathcal{O}(T N^2 + N T^2)$.
 
-### VideoMAE & 3D Tubelet Embedding
-VideoMAE ([Tong et al., NeurIPS 2022](https://arxiv.org/abs/2203.12608); extending Masked Autoencoders by [He et al., CVPR 2022](https://arxiv.org/abs/2111.06377) to video) introduces a **3D Tubelet Embedding layer** (`Conv3d` with kernel size $2 \times 16 \times 16$):
-- It merges 2 consecutive temporal frames along with a $16 \times 16$ spatial patch into a single initial token.
-- For a 16-frame input clip at $224 \times 224$:
+2. **3D Cube (Tubelet) Embedding + Joint Space-Time Attention** — used in **VideoMAE** ([Tong et al., NeurIPS 2022](https://arxiv.org/abs/2203.12602); extending Masked Autoencoders by [He et al., CVPR 2022](https://openaccess.thecvf.com/content/CVPR2022/html/He_Masked_Autoencoders_Are_Scalable_Vision_Learners_CVPR_2022_paper.html) ([arXiv:2111.06377](https://arxiv.org/abs/2111.06377)) to video):
+   - **3D Cube Embedding (`Conv3d`)**: Uses a 3D convolution with kernel size $2 \times 16 \times 16$ and stride $2 \times 16 \times 16$ to fuse 2 consecutive temporal frames and a $16 \times 16$ spatial patch into a single token, immediately halving the temporal token count $T' = T / 2$.
+   - **Extreme Tube Masking in Pre-Training**: During self-supervised pre-training, VideoMAE masks $90\%\text{--}95\%$ of the cube tokens using a temporally consistent tube mask, passing only the remaining $5\%\text{--}10\%$ visible tokens through a standard vanilla ViT encoder with **Joint Space-Time Self-Attention**.
+   - **Full-Token Inference with Mean Pooling**: During downstream evaluation on a 16-frame input clip at $224 \times 224$, all $1,568$ tokens are processed jointly and aggregated via **Global Mean Pooling (`fc_norm`)**:
 
 $$
 \text{Temporal Tokens} = \frac{16}{2} = 8, \quad \text{Spatial Tokens} = \left(\frac{224}{16}\right)^2 = 14 \times 14 = 196
@@ -82,8 +84,8 @@ $$
 | **Video Decoding** | Keyframe Seek | Disk MP4 | `(16, 360, 640, 3)` | 16 uniformly sampled RGB frames |
 | **VideoMAE Preprocessor** | Resize & Channel Reorder | `16 x [360, 640, 3]` | `[1, 16, 3, 224, 224]` | Hugging Face `AutoImageProcessor` |
 | **Tubelet Embedding** | Conv3D Projection | `[1, 16, 3, 224, 224]` | `[1, 1568, 768]` | 1568 tokens of embedding dim 768 |
-| **Transformer Backbone** | 12 Divided Attention Blocks | `[1, 1568, 768]` | `[1, 1568, 768]` | Deep contextualized tokens |
-| **Sequence Pooling** | Mean over tokens | `[1, 1568, 768]` | `[1, 768]` | Compact video feature vector |
+| **Transformer Backbone** | 12 Joint Space-Time ViT Blocks | `[1, 1568, 768]` | `[1, 1568, 768]` | Global self-attention across all 1,568 tokens |
+| **Sequence Pooling** | Mean over tokens (`fc_norm`) | `[1, 1568, 768]` | `[1, 768]` | Compact video feature vector |
 | **Classification Head** | Linear Projection | `[1, 768]` | `[1, 400]` | Logits over 400 Kinetics action classes |
 | **Softmax** | Normalization | `[1, 400]` | `[1, 400]` | Probabilities summing to 1.0 |
 
@@ -93,16 +95,16 @@ $$
 
 ### Running on Default Apple Silicon / Automatic Hardware
 ```bash
-python 02_video_transformer_inference.py --video data/person_bicycle.mp4
+python 03_video_transformer_inference.py --video data/person_bicycle.mp4
 ```
 
 ### Running on Dedicated GPU / MPS
 ```bash
 # Apple Silicon
-python 02_video_transformer_inference.py --video data/person_bicycle.mp4 --device mps
+python 03_video_transformer_inference.py --video data/person_bicycle.mp4 --device mps
 
 # NVIDIA Cloud GPU
-python 02_video_transformer_inference.py --video data/person_bicycle.mp4 --device cuda
+python 03_video_transformer_inference.py --video data/person_bicycle.mp4 --device cuda
 ```
 
 ### CLI Arguments Reference
@@ -198,8 +200,8 @@ VideoMAE was trained on 16-frame clips sampled at a specific stride.
    - Arnab, A., Dehghani, M., Heigold, G., Sun, C., Lučić, M., & Schmid, C. (2021). *ViViT: A Video Vision Transformer*. ICCV 2021.
    - Paper: [arXiv:2103.15691](https://arxiv.org/abs/2103.15691)
 4. **Masked Autoencoders (MAE)**:
-   - He, K., Chen, X., Xie, S., Li, Y., Dollár, P., & Girshick, R. (2022). *Masked Autoencoders Are Scalable Vision Learners*. CVPR 2022.
-   - Paper: [arXiv:2111.06377](https://arxiv.org/abs/2111.06377)
+   - He, K., Chen, X., Xie, S., Li, Y., Dollár, P., & Girshick, R. (2022). *Masked Autoencoders Are Scalable Vision Learners*. CVPR 2022, pp. 16000–16009.
+   - Paper: [CVPR 2022 OpenAccess](https://openaccess.thecvf.com/content/CVPR2022/html/He_Masked_Autoencoders_Are_Scalable_Vision_Learners_CVPR_2022_paper.html) | [arXiv:2111.06377](https://arxiv.org/abs/2111.06377)
 5. **VideoMAE (Masked Autoencoders for Video)**:
    - Tong, Z., Song, Y., Wang, J., & Wang, L. (2022). *VideoMAE: Masked Autoencoders are Data-Efficient Learners for Self-Supervised Video Pre-Training*. NeurIPS 2022.
    - Paper: [arXiv:2203.12602](https://arxiv.org/abs/2203.12602)

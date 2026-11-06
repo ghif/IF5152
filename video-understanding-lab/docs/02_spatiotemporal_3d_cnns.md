@@ -112,7 +112,7 @@ $$
 Setting the parameters equal to find the intermediate dimension $M$:
 
 $$
-M = \left\lfloor \frac{3 \cdot K_h \cdot K_w \cdot C_{\text{in}} \cdot C_{\text{out}}}{K_t \cdot C_{\text{in}} + K_h \cdot K_w \cdot C_{\text{out}}} \right\rfloor = \left\lfloor \frac{27 \cdot C_{\text{in}} \cdot C_{\text{out}}}{3 \cdot C_{\text{in}} + 9 \cdot C_{\text{out}}} \right\rfloor
+M = \left\lfloor \frac{K_t \cdot K_h \cdot K_w \cdot C_{\text{in}} \cdot C_{\text{out}}}{K_t \cdot C_{\text{in}} + K_h \cdot K_w \cdot C_{\text{out}}} \right\rfloor = \left\lfloor \frac{27 \cdot C_{\text{in}} \cdot C_{\text{out}}}{3 \cdot C_{\text{in}} + 9 \cdot C_{\text{out}}} \right\rfloor
 $$
 
 #### The Architectural Superpower of $R(2+1)D$:
@@ -257,7 +257,7 @@ python video-understanding-lab/02_spatiotemporal_3d_cnns.py --model all --device
 
 3. **Factorized Spatio-Temporal Convolutions:**
    - Tran, D., Wang, H., Torresani, L., Ray, J., LeCun, Y., & Paluri, M. (2018). "A Closer Look at Spatiotemporal Convolutions for Action Recognition". *IEEE Conference on Computer Vision and Pattern Recognition (CVPR 2018)*. [https://arxiv.org/abs/1711.11248](https://arxiv.org/abs/1711.11248)
-   - Xie, S., Sun, C., Huang, J., Tu, Z., & Murphy, K. (2018). "Rethinking Spatiotemporal Structuring for Video Recognition". *European Conference on Computer Vision (ECCV 2018)*. [https://arxiv.org/abs/1712.04851](https://arxiv.org/abs/1712.04851)
+   - Xie, S., Sun, C., Huang, J., Tu, Z., & Murphy, K. (2018). "Rethinking Spatiotemporal Feature Learning: Speed-Accuracy Trade-offs in Video Classification". *European Conference on Computer Vision (ECCV 2018)*. [https://arxiv.org/abs/1712.04851](https://arxiv.org/abs/1712.04851)
 
 4. **Multi-Rate Temporal Modeling:**
    - Feichtenhofer, C., Fan, H., Malik, J., & He, K. (2019). "SlowFast Networks for Video Recognition". *IEEE/CVF International Conference on Computer Vision (ICCV 2019)*. [https://arxiv.org/abs/1812.03982](https://arxiv.org/abs/1812.03982)

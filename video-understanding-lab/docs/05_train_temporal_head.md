@@ -9,7 +9,7 @@
 ## 1. Pedagogical Objective
 
 In this lab session, you will train a deep video action recognition model locally on your own machine:
-1. **The Industrial Reality of Video Training**: Why training 3D CNNs or Video Transformers from scratch is impractical for edge devices/laptops, and how **feature caching + temporal head fine-tuning** ([Sharif Razavian et al., 2014](https://arxiv.org/abs/1403.6382)) provides an ultra-fast, industrial-grade training paradigm.
+1. **The Industrial Reality of Video Training**: Why training 3D CNNs or Video Transformers from scratch is impractical for edge devices/laptops, and how **frozen 2D CNN spatial feature extraction** ([Sharif Razavian et al., CVPRW 2014](https://arxiv.org/abs/1403.6382); [Yosinski et al., NeurIPS 2014](https://arxiv.org/abs/1411.1792)), **offline frame-feature caching** ([Abu-El-Haija et al., YouTube-8M 2016](https://arxiv.org/abs/1609.08675)), and **temporal sequence head training** ([Donahue et al., CVPR 2015](https://arxiv.org/abs/1411.4389); [Yue-Hei Ng et al., CVPR 2015](https://arxiv.org/abs/1503.08909)) combine to provide an ultra-fast, industrial-grade training paradigm.
 2. **Backpropagation Through Time (BPTT)**: How gradients propagate backwards through a recurrent **Gated Recurrent Unit ([GRU; Cho et al., 2014](https://arxiv.org/abs/1406.1078))** temporal head across video frames ([Werbos, 1990](https://ieeexplore.ieee.org/document/58337)).
 3. **Apple Silicon M4 MPS Acceleration**: Leveraging PyTorch [Metal Performance Shaders (MPS)](https://developer.apple.com/metal/pytorch/) and Unified Memory Architecture (UMA) to train models in **fractions of a second per epoch**.
 
@@ -23,11 +23,15 @@ When training on video datasets end-to-end, two major bottlenecks arise:
 2. **Activation Memory Footprint**: Keeping intermediate feature maps for $T$ frames across all 2D/3D convolutional layers in VRAM during backpropagation quickly causes Out-Of-Memory (OOM) errors.
 
 ### The Solution: Feature Caching + Temporal Transfer Learning
-Because the spatial filters of a 2D backbone pretrained on ImageNet ([Deng et al., 2009](https://ieeexplore.ieee.org/document/5206848)) (such as [MobileNetV3; Howard et al., 2019](https://arxiv.org/abs/1905.02244) or [ResNet; He et al., 2016](https://arxiv.org/abs/1512.03385)) already capture low-level textures, edges, and object semantics, we can **freeze the spatial backbone** $\theta_{\text{backbone}}$ ([Sharif Razavian et al., 2014](https://arxiv.org/abs/1403.6382)):
+This workflow combines three foundational principles from the deep learning literature:
+1. **Transferability of Off-the-Shelf 2D Spatial Features**: Because the spatial filters of a 2D backbone pretrained on ImageNet ([Deng et al., 2009](https://ieeexplore.ieee.org/document/5206848)) (such as [MobileNetV3; Howard et al., 2019](https://arxiv.org/abs/1905.02244) or [ResNet; He et al., 2016](https://arxiv.org/abs/1512.03385)) already capture generalizable edges, textures, and object parts ([Sharif Razavian et al., CVPRW 2014](https://arxiv.org/abs/1403.6382); [Yosinski et al., NeurIPS 2014](https://arxiv.org/abs/1411.1792)), we can **freeze the spatial backbone** $\theta_{\text{backbone}}$:
 
 $$
 \nabla_{\theta_{\text{backbone}}} \mathcal{L} = 0
 $$
+
+2. **Late Temporal Sequence Heads for Video**: Rather than backpropagating through pixel-level 3D convolutions, we feed the sequence of frame-level feature vectors $\mathbf{h}_{1:T}$ into a lightweight temporal aggregation head—either **Temporal Feature Pooling** or a **Recurrent Sequence Model (LSTM/GRU)**—following the classic 2D-CNN + RNN video recognition paradigm ([Donahue et al., CVPR 2015](https://arxiv.org/abs/1411.4389); [Yue-Hei Ng et al., CVPR 2015](https://arxiv.org/abs/1503.08909)).
+3. **One-Time Offline Feature Pre-Extraction & Caching**: Since $\theta_{\text{backbone}}$ is deterministic and frozen (with no random frame-level spatial augmentations applied during caching), passing the same video clip through the 2D CNN across 20 epochs would recompute the exact same vectors $\mathbf{h}_{1:T}$ 20 times. Following large-scale video benchmarks like **YouTube-8M** ([Abu-El-Haija et al., 2016](https://arxiv.org/abs/1609.08675)), we decode each video and extract $\mathbf{h}_{1:T} \in \mathbb{R}^{T \times D}$ **only once** before training, caching the resulting `[N, T, D]` tensor directly in RAM/UMA so the temporal head trains in milliseconds per epoch:
 
 ```mermaid
 flowchart TD
@@ -237,16 +241,26 @@ python 05_train_temporal_head.py --dataset synthetic --fusion gru --epochs 10
    - Paper: [arXiv:1406.1078](https://arxiv.org/abs/1406.1078)
    - Chung, J., Gulcehre, C., Cho, K., & Bengio, Y. (2014). *Empirical Evaluation of Gated Recurrent Neural Networks on Sequence Modeling*. NeurIPS 2014 Workshop on Deep Learning.
    - Paper: [arXiv:1412.3555](https://arxiv.org/abs/1412.3555)
-3. **CNN Features Off-the-Shelf for Transfer Learning**:
+3. **Transferability of Off-the-Shelf 2D CNN Features**:
    - Sharif Razavian, A., Azizpour, H., Sullivan, J., & Carlsson, S. (2014). *CNN Features off-the-shelf: an Astounding Baseline for Recognition*. CVPR Workshops 2014.
    - Paper: [arXiv:1403.6382](https://arxiv.org/abs/1403.6382)
-4. **MobileNetV3**:
+   - Yosinski, J., Clune, J., Bengio, Y., & Lipson, H. (2014). *How transferable are features in deep neural networks?*. NeurIPS 2014.
+   - Paper: [arXiv:1411.1792](https://arxiv.org/abs/1411.1792)
+4. **2D CNN + Temporal Sequence Heads (LRCN / Pooling & Recurrent Video Classification)**:
+   - Donahue, J., Anne Hendricks, L., Guadarrama, S., Rohrbach, M., Venugopalan, S., Saenko, K., & Darrell, T. (2015). *Long-term Recurrent Convolutional Networks for Visual Recognition and Description*. CVPR 2015.
+   - Paper: [arXiv:1411.4389](https://arxiv.org/abs/1411.4389)
+   - Yue-Hei Ng, J., Hausknecht, M., Vijayanarasimhan, S., Vinyals, O., Monga, R., & Toderici, G. (2015). *Beyond Short Snippets: Deep Networks for Video Classification*. CVPR 2015.
+   - Paper: [arXiv:1503.08909](https://arxiv.org/abs/1503.08909)
+5. **Pre-Extracted Frame Features & Large-Scale Video Feature Caching (YouTube-8M)**:
+   - Abu-El-Haija, S., Kothari, N., Lee, J., Natsev, P., Toderici, G., Varadarajan, B., & Vijayanarasimhan, S. (2016). *YouTube-8M: A Large-Scale Video Classification Benchmark*.
+   - Paper: [arXiv:1609.08675](https://arxiv.org/abs/1609.08675)
+6. **MobileNetV3**:
    - Howard, A., Sandler, M., Chu, G., Chen, L. C., Chen, B., Tan, M., Wang, W., Zhu, Y., Pang, R., Vasudevan, V., Le, Q. V., & Adam, H. (2019). *Searching for MobileNetV3*. ICCV 2019.
    - Paper: [arXiv:1905.02244](https://arxiv.org/abs/1905.02244)
-5. **AdamW Optimization (Decoupled Weight Decay)**:
+7. **AdamW Optimization (Decoupled Weight Decay)**:
    - Loshchilov, I., & Hutter, F. (2019). *Decoupled Weight Decay Regularization*. ICLR 2019.
    - Paper: [arXiv:1711.05101](https://arxiv.org/abs/1711.05101)
-6. **UCF101 Action Recognition Benchmark**:
+8. **UCF101 Action Recognition Benchmark**:
    - Soomro, K., Roshan Zamir, A., & Shah, M. (2012). *UCF101: A Dataset of 101 Human Actions Classes From Videos in The Wild*. Center for Research in Computer Vision (CRCV-TR-12-01).
    - Paper: [arXiv:1212.0402](https://arxiv.org/abs/1212.0402)
 7. **Apple Silicon PyTorch Acceleration (MPS)**:
