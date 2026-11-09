@@ -22,7 +22,9 @@ Unlike GANs (which generate samples in a single forward pass through an adversar
 
 The forward process $q$ is a fixed, non-learnable Markov chain that gradually destroys information by adding Gaussian noise over $T$ timesteps according to a predefined variance schedule $\beta_1, \beta_2, \dots, \beta_T$:
 
-$$q(x_t \mid x_{t-1}) = \mathcal{N}\left(x_t; \sqrt{1 - \beta_t} x_{t-1}, \, \beta_t \mathbf{I}\right)$$
+$$
+q(x_t \mid x_{t-1}) = \mathcal{N}\left(x_t; \sqrt{1 - \beta_t} x_{t-1}, \, \beta_t \mathbf{I}\right)
+$$
 
 ```mermaid
 flowchart LR
@@ -35,7 +37,9 @@ flowchart LR
 A key mathematical property of Gaussian Markov chains is that we do not need to simulate $t$ intermediate steps to generate $x_t$.
 Let $\alpha_t = 1 - \beta_t$ and $\bar{\alpha}_t = \prod_{s=1}^t \alpha_s$:
 
-$$x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon, \quad \text{where } \epsilon \sim \mathcal{N}(0, \mathbf{I})$$
+$$
+x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon, \quad \text{where } \epsilon \sim \mathcal{N}(0, \mathbf{I})
+$$
 
 This closed form allows us to sample an arbitrary timestep $t \sim \mathcal{U}(1, T)$ in $O(1)$ constant time during training!
 
@@ -48,28 +52,40 @@ However, $q(x_{t-1} \mid x_t)$ depends on the entire data distribution $q(x_0)$,
 
 Instead, we train a parameterized neural network $p_\theta(x_{t-1} \mid x_t)$ (typically a U-Net with timestep embeddings) to approximate this reverse distribution:
 
-$$p_\theta(x_{t-1} \mid x_t) = \mathcal{N}\left(x_{t-1}; \mu_\theta(x_t, t), \, \Sigma_\theta(x_t, t)\right)$$
+$$
+p_\theta(x_{t-1} \mid x_t) = \mathcal{N}\left(x_{t-1}; \mu_\theta(x_t, t), \, \Sigma_\theta(x_t, t)\right)
+$$
 
 [Ho et al. (2020)](https://arxiv.org/abs/2006.11239) demonstrated that fixing $\Sigma_\theta(x_t, t) = \sigma_t^2 \mathbf{I}$ (where $\sigma_t^2 = \beta_t$ or $\tilde{\beta}_t = \frac{1 - \bar{\alpha}_{t-1}}{1 - \bar{\alpha}_t} \beta_t$) works remarkably well, leaving only the mean $\mu_\theta$ to be learned.
 
 ---
 
-## 4. The Training Objective ($L_{simple}$)
+## 4. The Training Objective ($L_{\text{simple}}$)
 
 By expanding the Variational Lower Bound (VLB) on the negative log-likelihood $\mathbb{E}[-\log p_\theta(x_0)]$, the objective reduces to matching the reverse step posterior with a closed form:
 
-$$q(x_{t-1} \mid x_t, x_0) = \mathcal{N}\left(x_{t-1}; \tilde{\mu}_t(x_t, x_0), \tilde{\beta}_t \mathbf{I}\right)$$
+$$
+q(x_{t-1} \mid x_t, x_0) = \mathcal{N}\left(x_{t-1}; \tilde{\mu}_t(x_t, x_0), \tilde{\beta}_t \mathbf{I}\right)
+$$
+
 where:
-$$\tilde{\mu}_t(x_t, x_0) = \frac{\sqrt{\bar{\alpha}_{t-1}}\beta_t}{1 - \bar{\alpha}_t} x_0 + \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} x_t$$
+
+$$
+\tilde{\mu}_t(x_t, x_0) = \frac{\sqrt{\bar{\alpha}_{t-1}}\beta_t}{1 - \bar{\alpha}_t} x_0 + \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} x_t
+$$
 
 Substituting $x_0 = \frac{x_t - \sqrt{1 - \bar{\alpha}_t}\epsilon}{\sqrt{\bar{\alpha}_t}}$ reveals that predicting $\tilde{\mu}_t$ is equivalent to **predicting the Gaussian noise vector $\epsilon$** that was injected at step $t$:
 
-$$\mu_\theta(x_t, t) = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{\beta_t}{\sqrt{1 - \bar{\alpha}_t}} \epsilon_\theta(x_t, t) \right)$$
+$$
+\mu_\theta(x_t, t) = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{\beta_t}{\sqrt{1 - \bar{\alpha}_t}} \epsilon_\theta(x_t, t) \right)
+$$
 
 ### Simplified Loss Function
 Ho et al. showed that dropping the complicated weighting factors yields superior perceptual generation quality:
 
-$$\mathcal{L}_{simple}(\theta) = \mathbb{E}_{t \sim [1, T], \, x_0, \, \epsilon \sim \mathcal{N}(0, \mathbf{I})} \left[ \| \epsilon - \epsilon_\theta(x_t, t) \|_2^2 \right]$$
+$$
+\mathcal{L}_{\text{simple}}(\theta) = \mathbb{E}_{t \sim [1, T], \, x_0, \, \epsilon \sim \mathcal{N}(0, \mathbf{I})} \left[ \| \epsilon - \epsilon_\theta(x_t, t) \|_2^2 \right]
+$$
 
 ### Training Algorithm in 4 Steps:
 1. Sample clean data $x_0 \sim q(x_0)$ from the training batch.
@@ -88,7 +104,11 @@ To synthesize a new image from scratch using the standard Markovian formulation:
 2. For $t = T, T-1, \dots, 1$:
    - Sample $z \sim \mathcal{N}(0, \mathbf{I})$ if $t > 1$, else $z = \mathbf{0}$.
    - Compute:
-     $$x_{t-1} = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t}} \epsilon_\theta(x_t, t) \right) + \sigma_t z$$
+
+$$
+x_{t-1} = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t}} \epsilon_\theta(x_t, t) \right) + \sigma_t z
+$$
+
      where $\sigma_t^2 = \beta_t$ or $\tilde{\beta}_t = \frac{1 - \bar{\alpha}_{t-1}}{1 - \bar{\alpha}_t} \beta_t$.
 3. Return clean sample $x_0$.
 
@@ -100,18 +120,30 @@ While theoretically sound, DDPM requires $T = 1000$ sequential network evaluatio
 
 [Song, Meng, & Ermon (ICLR 2021)](https://arxiv.org/abs/2010.02502) proved that the forward marginal distributions $q(x_t \mid x_0)$ can be matched using a family of **non-Markovian forward inference processes**:
 
-$$q_\sigma(x_{t-1} \mid x_t, x_0) = \mathcal{N}\left( \sqrt{\bar{\alpha}_{t-1}} x_0 + \sqrt{1 - \bar{\alpha}_{t-1} - \sigma_t^2} \frac{x_t - \sqrt{\bar{\alpha}_t}x_0}{\sqrt{1 - \bar{\alpha}_t}}, \, \sigma_t^2 \mathbf{I} \right)$$
+$$
+q_\sigma(x_{t-1} \mid x_t, x_0) = \mathcal{N}\left( \sqrt{\bar{\alpha}_{t-1}} x_0 + \sqrt{1 - \bar{\alpha}_{t-1} - \sigma_t^2} \frac{x_t - \sqrt{\bar{\alpha}_t}x_0}{\sqrt{1 - \bar{\alpha}_t}}, \, \sigma_t^2 \mathbf{I} \right)
+$$
 
 where the stochasticity is governed by:
-$$\sigma_t = \eta \sqrt{\frac{1 - \bar{\alpha}_{t-1}}{1 - \bar{\alpha}_t}} \sqrt{1 - \frac{\bar{\alpha}_t}{\bar{\alpha}_{t-1}}}$$
+
+$$
+\sigma_t = \eta \sqrt{\frac{1 - \bar{\alpha}_{t-1}}{1 - \bar{\alpha}_t}} \sqrt{1 - \frac{\bar{\alpha}_t}{\bar{\alpha}_{t-1}}}
+$$
 
 #### The Deterministic ODE Regime ($\eta = 0$):
 When $\eta = 0$, $\sigma_t = 0$. The stochastic reverse process collapses into a **completely deterministic Ordinary Differential Equation (ODE)** trajectory:
 
 1. **Predict Clean Image ($\hat{x}_0$):**
-   $$\hat{x}_0 = \frac{x_t - \sqrt{1 - \bar{\alpha}_t} \epsilon_\theta(x_t, t)}{\sqrt{\bar{\alpha}_t}}$$
+
+$$
+\hat{x}_0 = \frac{x_t - \sqrt{1 - \bar{\alpha}_t} \epsilon_\theta(x_t, t)}{\sqrt{\bar{\alpha}_t}}
+$$
+
 2. **Deterministic Step to $x_{t-1}$:**
-   $$x_{t-1} = \sqrt{\bar{\alpha}_{t-1}} \hat{x}_0 + \sqrt{1 - \bar{\alpha}_{t-1}} \epsilon_\theta(x_t, t)$$
+
+$$
+x_{t-1} = \sqrt{\bar{\alpha}_{t-1}} \hat{x}_0 + \sqrt{1 - \bar{\alpha}_{t-1}} \epsilon_\theta(x_t, t)
+$$
 
 #### Key Advantages of DDIM:
 - **Sub-sequence Sampling ($S \ll T$):** Instead of simulating all $T = 1000$ timesteps, DDIM samples along an evenly spaced trajectory $\tau = [\tau_1, \tau_2, \dots, \tau_S]$ (e.g., $S = 25$ or $50$ steps).
@@ -126,12 +158,20 @@ In class-conditional synthesis, conditioning simply on class labels often produc
 
 #### 1. Training with Label Dropout:
 During training, the class label $y \in \{0, \dots, K-1\}$ is randomly dropped to an unconditional null token $\emptyset$ with probability $p_{\text{uncond}} \approx 0.15$:
-$$y_{\text{train}} = \begin{cases} \emptyset & \text{with probability } p_{\text{uncond}} \\ y & \text{with probability } 1 - p_{\text{uncond}} \end{cases}$$
+
+$$
+y_{\text{train}} = \begin{cases}
+\emptyset & \text{with probability } p_{\text{uncond}}, \\
+y & \text{with probability } 1 - p_{\text{uncond}}
+\end{cases}
+$$
 
 #### 2. Inference Extrapolation:
 At sampling time, the network computes both the conditional estimate $\epsilon_\theta(x_t, t, y)$ and the unconditional estimate $\epsilon_\theta(x_t, t, \emptyset)$. The guided noise prediction extrapolates away from the unconditional prior:
 
-$$\hat{\epsilon}_\theta(x_t, t, y) = \epsilon_\theta(x_t, t, \emptyset) + w \cdot \left( \epsilon_\theta(x_t, t, y) - \epsilon_\theta(x_t, t, \emptyset) \right)$$
+$$
+\hat{\epsilon}_\theta(x_t, t, y) = \epsilon_\theta(x_t, t, \emptyset) + w \cdot \left( \epsilon_\theta(x_t, t, y) - \epsilon_\theta(x_t, t, \emptyset) \right)
+$$
 
 where $w \ge 1.0$ is the **guidance scale**:
 - $w = 1.0$: Standard conditional diffusion.
@@ -144,7 +184,11 @@ where $w \ge 1.0$ is the **guidance scale**:
 For natural image datasets like CIFAR-10 ($3 \times 32 \times 32$), the architecture features:
 1. **Sinusoidal Position Encoding + SiLU MLP:** Maps discrete scalar timestep $t$ to continuous conditioning vector $e_{\text{time}} \in \mathbb{R}^{128}$.
 2. **Class Embedding:** Maps class index $y \in \{0, \dots, K\}$ to $e_{\text{class}} \in \mathbb{R}^{128}$, merged via element-wise addition:
-   $$e_{\text{cond}} = e_{\text{time}} + e_{\text{class}}$$
+
+$$
+e_{\text{cond}} = e_{\text{time}} + e_{\text{class}}
+$$
+
 3. **Residual Blocks (`ResBlock`):** Pre-activation `GroupNorm` + `SiLU` + $3\times 3$ Conv with adaptive conditioning projection ($h + \text{Linear}(e_{\text{cond}})$) and residual skip paths.
 4. **Spatial Self-Attention:** Multi-head attention at $16 \times 16$ and $8 \times 8$ feature resolutions to coordinate long-range spatial correlations across object components.
 
@@ -156,7 +200,9 @@ In diffusion models, gradients at step $t$ are computed across random noise scal
 
 To stabilize inference and achieve photorealistic synthesis, modern diffusion models maintain an **Exponential Moving Average (EMA)** shadow copy of all model parameters ([Song & Ermon, 2020](https://arxiv.org/abs/1907.05600); [Ho et al., 2020](https://arxiv.org/abs/2006.11239)):
 
-$$\theta_{\text{EMA}} \leftarrow \beta \cdot \theta_{\text{EMA}} + (1 - \beta) \cdot \theta$$
+$$
+\theta_{\text{EMA}} \leftarrow \beta \cdot \theta_{\text{EMA}} + (1 - \beta) \cdot \theta
+$$
 
 where $\beta \in [0.995, 0.9999]$ (typically $\beta = 0.999$):
 - **Training:** Backpropagation updates raw parameters $\theta$ via AdamW, and $\theta_{\text{EMA}}$ is updated as a running average.
@@ -170,10 +216,10 @@ In the landmark paper *"Diffusion Models Beat GANs on Image Synthesis"* ([Dhariw
 
 | Criterion | Generative Adversarial Networks (GANs) | Denoising Diffusion Models (DDPM) |
 | :--- | :--- | :--- |
-| **Optimization Stability** | ⚠️ Unstable minimax game; prone to mode collapse |  Stable standard L2 regression objective |
-| **Mode Coverage** | ⚠️ Often misses rare modes of data distribution |  Excellent diversity (covers full support of data) |
-| **Sample Quality** |  Sharp, but fragile hyperparameter tuning |  Superior fidelity and photo-realism |
-| **Sampling Latency** |  1 forward pass ($O(1)$) | ⚠️ 50–1000 iterative steps ($O(T)$) (accelerated via DDIM/flow matching) |
+| **Optimization Stability** | ⚠️ Unstable minimax game; prone to mode collapse | ✅ Stable standard L2 regression objective |
+| **Mode Coverage** | ⚠️ Often misses rare modes of data distribution | ✅ Excellent diversity (covers full support of data) |
+| **Sample Quality** | ✅ Sharp, but fragile hyperparameter tuning | ✅ Superior fidelity and photo-realism |
+| **Sampling Latency** | ✅ 1 forward pass ($O(1)$) | ⚠️ 50–1000 iterative steps ($O(T)$) (accelerated via DDIM/flow matching) |
 | **Theoretical Rigor** | Game theory & saddle point equilibrium | Non-equilibrium thermodynamics & score matching ([Song et al., 2021](https://arxiv.org/abs/2011.13456)) |
 
 To overcome the pixel-space computational cost of high-resolution diffusion, modern foundation models (such as Stable Diffusion) operate in latent space (**Latent Diffusion Models**, [Rombach et al., CVPR 2022](https://arxiv.org/abs/2112.10752)).

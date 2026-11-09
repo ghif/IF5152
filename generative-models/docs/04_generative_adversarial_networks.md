@@ -18,7 +18,9 @@ flowchart LR
     x_in -.->|"Reconstruction Penalty ||x - x_hat||^2"| x_rec
 ```
 
-$$\max_{\theta, \phi} \mathcal{L}_{\text{ELBO}}(\theta, \phi; x) = \mathbb{E}_{q_\phi(z \mid x)} [\log p_\theta(x \mid z)] - D_{\text{KL}}\big(q_\phi(z \mid x) \parallel p(z)\big)$$
+$$
+\max_{\theta, \phi} \mathcal{L}_{\text{ELBO}}(\theta, \phi; x) = \mathbb{E}_{q_\phi(z \mid x)} [\log p_\theta(x \mid z)] - D_{\text{KL}}\big(q_\phi(z \mid x) \parallel p(z)\big)
+$$
 
 ---
 
@@ -34,22 +36,36 @@ flowchart LR
     Disc --> out_decision["Decision Score<br/>D(x) in [0, 1]"]
 ```
 
-$$\min_G \max_D V(D, G) = \mathbb{E}_{x \sim p_{\text{data}}} [\log D(x)] + \mathbb{E}_{z \sim p_z} [\log (1 - D(G(z)))]$$
+$$
+\min_G \max_D V(D, G) = \mathbb{E}_{x \sim p_{\text{data}}} [\log D(x)] + \mathbb{E}_{z \sim p_z} [\log (1 - D(G(z)))]
+$$
 
 ### 1.1 Core Conceptual & Mathematical Contrasts
 
 #### 1. Explicit vs. Implicit Density Modeling
 - **VAEs (Explicit / Tractable Lower Bound):** A VAE specifies an explicit parametric probability distribution over data:
-  $$p_\theta(x) = \int p_\theta(x \mid z) p(z) \, dz$$
+
+$$
+p_\theta(x) = \int p_\theta(x \mid z) p(z) \, dz
+$$
+
   Because marginalizing over all latent variables $z$ is computationally intractable, VAEs optimize the **Evidence Lower Bound (ELBO)** as a rigorous proxy for true log-likelihood:
-  $$\log p(x) \ge \mathcal{L}_{ELBO}(\theta, \phi; x) = \mathbb{E}_{q_\phi(z \mid x)} [\log p_\theta(x \mid z)] - D_{KL}\big(q_\phi(z \mid x) \parallel p(z)\big)$$
+
+$$
+\log p(x) \ge \mathcal{L}_{\text{ELBO}}(\theta, \phi; x) = \mathbb{E}_{q_\phi(z \mid x)} [\log p_\theta(x \mid z)] - D_{\text{KL}}\big(q_\phi(z \mid x) \parallel p(z)\big)
+$$
+
   VAEs belong to the class of **likelihood-based models**, optimizing density via variational approximation.
 - **GANs (Implicit / Likelihood-Free):** A GAN completely abandons explicit probability density formulation. The generator $G: \mathcal{Z} \to \mathcal{X}$ defines an **implicit distribution** $p_g$: you cannot evaluate $p_g(x)$ or compute marginal log-likelihoods $\log p(x)$. Instead, you can only **draw samples** by evaluating $x = G(z)$ with $z \sim p_z$. Learning is driven not by maximum likelihood, but by statistical distribution matching evaluated by an adversary.
 
 #### 2. Cooperative Inference vs. Non-Cooperative Minimax Game
-- **VAEs (Cooperative Single-Agent Optimization):** The encoder $q_\phi$ and decoder $p_\theta$ work cooperatively toward a single shared objective ($\max_{\theta, \phi} \mathcal{L}_{ELBO}$). Gradients flow cleanly throughout the network via the reparameterization trick ($z = \mu + \sigma \odot \epsilon$), yielding stable and predictable gradient ascent dynamics.
+- **VAEs (Cooperative Single-Agent Optimization):** The encoder $q_\phi$ and decoder $p_\theta$ work cooperatively toward a single shared objective ($\max_{\theta, \phi} \mathcal{L}_{\text{ELBO}}$). Gradients flow cleanly throughout the network via the reparameterization trick ($z = \mu + \sigma \odot \epsilon$), yielding stable and predictable gradient ascent dynamics.
 - **GANs (Two-Player Zero-Sum Game):** Training is framed as a non-cooperative game between two competing neural networks:
-  $$\min_G \max_D V(D, G) = \mathbb{E}_{x \sim p_{data}} [\log D(x)] + \mathbb{E}_{z \sim p_z} [\log (1 - D(G(z)))]$$
+
+$$
+\min_G \max_D V(D, G) = \mathbb{E}_{x \sim p_{\text{data}}} [\log D(x)] + \mathbb{E}_{z \sim p_z} [\log (1 - D(G(z)))]
+$$
+
   Rather than minimizing a static scalar loss, the system seeks a **Nash equilibrium** in high-dimensional non-convex parameter space. This game-theoretic setting makes GANs notorious for training instability, limit cycles, oscillatory dynamics, and catastrophic mode collapse.
 
 #### 3. Asymmetry in Latent Inference ($x \to z$)
@@ -74,12 +90,20 @@ Reverse KL / JSD (GANs): "Mode-Seeking" (Zero-Forcing)
 
 - **VAEs Minimize Forward KL Divergence (Mean-Seeking / Zero-Avoiding):**
   Maximizing log-likelihood is mathematically equivalent to minimizing the forward Kullback-Leibler divergence:
-  $$\min_\theta D_{KL}(p_{data} \parallel p_\theta) = \int p_{data}(x) \log \frac{p_{data}(x)}{p_\theta(x)} \, dx$$
-  If $p_{data}(x) > 0$ for any sample $x$, then $p_\theta(x)$ cannot be zero, otherwise the objective incurs an infinite penalty ($\frac{p_{data}}{0} \to \infty$). Consequently, the model is **zero-avoiding**: it must spread probability mass over all observed variations. Paired with pixel-wise Gaussian reconstruction losses (such as Mean Squared Error $\|x - \hat{x}\|_2^2$), the decoder hedges its bets by outputting the statistical mean of plausible high-frequency textures, producing characteristic blurriness.
+
+$$
+\min_\theta D_{\text{KL}}(p_{\text{data}} \parallel p_\theta) = \int p_{\text{data}}(x) \log \frac{p_{\text{data}}(x)}{p_\theta(x)} \, dx
+$$
+
+  If $p_{\text{data}}(x) > 0$ for any sample $x$, then $p_\theta(x)$ cannot be zero, otherwise the objective incurs an infinite penalty ($\frac{p_{\text{data}}}{0} \to \infty$). Consequently, the model is **zero-avoiding**: it must spread probability mass over all observed variations. Paired with pixel-wise Gaussian reconstruction losses (such as Mean Squared Error $\|x - \hat{x}\|_2^2$), the decoder hedges its bets by outputting the statistical mean of plausible high-frequency textures, producing characteristic blurriness.
 - **GANs Minimize Jensen-Shannon Divergence (Mode-Seeking / Zero-Forcing):**
   As proven by Goodfellow et al. (2014), when the discriminator is optimal, the minimax objective equates to minimizing the symmetric **Jensen-Shannon Divergence (JSD)**:
-  $$V(D^*, G) = 2 \cdot D_{JS}(p_{data} \parallel p_g) - \log 4$$
-  In practical training (especially under the non-saturating loss $-\log D(G(z))$), the adversary severely penalizes the generator for producing unnatural, blurry, or interpolated artifacts because the discriminator easily detects them as fakes ($D(x_{fake}) \approx 0$). The generator is thus driven by a **mode-seeking (zero-forcing)** objective: it is heavily rewarded for generating crisp, realistic patches that closely match true data modes, even if it ignores or drops other valid modes entirely (**mode collapse**).
+
+$$
+V(D^*, G) = 2 \cdot D_{\text{JS}}(p_{\text{data}} \parallel p_g) - \log 4
+$$
+
+  In practical training (especially under the non-saturating loss $-\log D(G(z))$), the adversary severely penalizes the generator for producing unnatural, blurry, or interpolated artifacts because the discriminator easily detects them as fakes ($D(x_{\text{fake}}) \approx 0$). The generator is thus driven by a **mode-seeking (zero-forcing)** objective: it is heavily rewarded for generating crisp, realistic patches that closely match true data modes, even if it ignores or drops other valid modes entirely (**mode collapse**).
 
 ---
 
@@ -89,13 +113,13 @@ Reverse KL / JSD (GANs): "Mode-Seeking" (Zero-Forcing)
 | :--- | :--- | :--- |
 | **Generative Family** | Explicit Density (Approximated via Variational Inference) | Implicit Density (Likelihood-Free, Direct Sampling) |
 | **Core Architecture** | Encoder $q_\phi(z \mid x)$ + Decoder $p_\theta(x \mid z)$ | Generator $G_\theta(z)$ + Discriminator $D_\phi(x)$ |
-| **Mathematical Objective** | Maximize ELBO: $\mathbb{E}_{q}[\log p(x\mid z)] - D_{KL}(q \parallel p)$ | Minimax game: $\min_G \max_D \mathbb{E}[\log D] + \mathbb{E}[\log(1 - D(G))]$ |
-| **Latent Inference ($x \to z$)** |  **Native** (Encoder directly predicts $\mu_\phi(x), \Sigma_\phi(x)$) | ❌ **None** in vanilla GAN (Requires inversion or BiGAN/ALI) |
-| **Latent Space Geometry** | Smooth, compact, centered via $D_{KL}(q(z\mid x) \parallel \mathcal{N}(0, I))$ | Unconstrained prior $z \sim p_z$ mapped non-linearly by $G$ |
-| **Divergence Minimized** | Forward KL: $D_{KL}(p_{data} \parallel p_\theta)$ (via MLE) | Jensen-Shannon Divergence: $D_{JS}(p_{data} \parallel p_g)$ |
+| **Mathematical Objective** | Maximize ELBO: $\mathbb{E}_{q}[\log p(x\mid z)] - D_{\text{KL}}(q \parallel p)$ | Minimax game: $\min_G \max_D \mathbb{E}[\log D] + \mathbb{E}[\log(1 - D(G))]$ |
+| **Latent Inference ($x \to z$)** | ✅ **Native** (Encoder directly predicts $\mu_\phi(x), \Sigma_\phi(x)$) | ❌ **None** in vanilla GAN (Requires inversion or BiGAN/ALI) |
+| **Latent Space Geometry** | Smooth, compact, centered via $D_{\text{KL}}(q(z\mid x) \parallel \mathcal{N}(0, I))$ | Unconstrained prior $z \sim p_z$ mapped non-linearly by $G$ |
+| **Divergence Minimized** | Forward KL: $D_{\text{KL}}(p_{\text{data}} \parallel p_\theta)$ (via MLE) | Jensen-Shannon Divergence: $D_{\text{JS}}(p_{\text{data}} \parallel p_g)$ |
 | **Statistical Behavior** | **Mean-seeking / Zero-avoiding** (Covers all data modes) | **Mode-seeking / Zero-forcing** (Focuses on mode peaks) |
-| **Visual Sample Quality** | ⚠️ Often blurry / smooth (L2/Gaussian pixel averaging) |  Crisp, high-frequency details, realistic textures |
-| **Training Dynamics** |  Stable, monotonic gradient ascent on ELBO | ⚠️ Unstable, sensitive hyperparameters, oscillatory non-convergence |
+| **Visual Sample Quality** | ⚠️ Often blurry / smooth (L2/Gaussian pixel averaging) | ✅ Crisp, high-frequency details, realistic textures |
+| **Training Dynamics** | ✅ Stable, monotonic gradient ascent on ELBO | ⚠️ Unstable, sensitive hyperparameters, oscillatory non-convergence |
 | **Primary Failure Mode** | Blurry generations, posterior collapse ($q_\phi(z\mid x) \approx p(z)$) | Mode collapse (dropping diversity), vanishing gradients |
 | **Sampling Complexity** | Fast single forward pass: $z \sim \mathcal{N}(0, I) \to \text{Dec}(z)$ ($O(1)$) | Fast single forward pass: $z \sim p_z \to G(z)$ ($O(1)$) |
 
@@ -135,7 +159,10 @@ flowchart LR
 ```
 
 ### The Minimax Objective Function
-$$\min_G \max_D V(D, G) = \mathbb{E}_{x \sim p_{data}(x)} [\log D(x)] + \mathbb{E}_{z \sim p_z(z)} [\log (1 - D(G(z)))]$$
+
+$$
+\min_G \max_D V(D, G) = \mathbb{E}_{x \sim p_{\text{data}}(x)} [\log D(x)] + \mathbb{E}_{z \sim p_z(z)} [\log (1 - D(G(z)))]
+$$
 
 ---
 
@@ -143,32 +170,52 @@ $$\min_G \max_D V(D, G) = \mathbb{E}_{x \sim p_{data}(x)} [\log D(x)] + \mathbb{
 
 ### Optimal Discriminator $D^*(x)$
 For any fixed generator $G$, the objective can be rewritten in continuous integral form:
-$$V(D, G) = \int_x \Big( p_{data}(x) \log D(x) + p_g(x) \log(1 - D(x)) \Big) \, dx$$
 
-To maximize the integrand at every point $x$, consider the scalar objective $f(y) = a \log y + b \log(1 - y)$, where $a = p_{data}(x)$, $b = p_g(x)$, and $y = D(x)$. Setting the derivative with respect to $y$ to zero:
-$$\frac{df}{dy} = \frac{a}{y} - \frac{b}{1 - y} = 0 \implies a(1 - y) = b y \implies y^* = \frac{a}{a + b}$$
+$$
+V(D, G) = \int_x \Big( p_{\text{data}}(x) \log D(x) + p_g(x) \log(1 - D(x)) \Big) \, dx
+$$
+
+To maximize the integrand at every point $x$, consider the scalar objective $f(y) = a \log y + b \log(1 - y)$, where $a = p_{\text{data}}(x)$, $b = p_g(x)$, and $y = D(x)$. Setting the derivative with respect to $y$ to zero:
+
+$$
+\frac{df}{dy} = \frac{a}{y} - \frac{b}{1 - y} = 0 \implies a(1 - y) = b y \implies y^* = \frac{a}{a + b}
+$$
 
 Therefore, the optimal discriminator for any given generator is:
-$$D^*(x) = \frac{p_{data}(x)}{p_{data}(x) + p_g(x)}$$
+
+$$
+D^*(x) = \frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_g(x)}
+$$
 
 ### Connection to Jensen-Shannon Divergence
 Substituting $D^*(x)$ back into the minimax value function ([Nowozin, Cseke, & Tomioka, NeurIPS 2016](https://arxiv.org/abs/1606.00709)):
-$$V(D^*, G) = \int_x \left[ p_{data}(x) \log \frac{p_{data}(x)}{p_{data}(x) + p_g(x)} + p_g(x) \log \frac{p_g(x)}{p_{data}(x) + p_g(x)} \right] dx$$
+
+$$
+V(D^*, G) = \int_x \left[ p_{\text{data}}(x) \log \frac{p_{\text{data}}(x)}{p_{\text{data}}(x) + p_g(x)} + p_g(x) \log \frac{p_g(x)}{p_{\text{data}}(x) + p_g(x)} \right] dx
+$$
 
 Adding and subtracting $\log 2$ inside the logarithms:
-$$V(D^*, G) = -\log 4 + D_{KL}\left(p_{data} \parallel \frac{p_{data} + p_g}{2}\right) + D_{KL}\left(p_g \parallel \frac{p_{data} + p_g}{2}\right)$$
-$$V(D^*, G) = -\log 4 + 2 \cdot D_{JS}(p_{data} \parallel p_g)$$
 
-where $D_{JS}$ is the symmetric **Jensen-Shannon Divergence**.
-- The global minimum occurs if and only if $p_g = p_{data}$.
-- At this equilibrium, $D_{JS} = 0$, $V(D^*, G) = -\log 4 \approx -1.386$, and $D^*(x) = \frac{1}{2}$ everywhere (the discriminator cannot distinguish real samples from generator fakes).
+$$
+\begin{aligned}
+V(D^*, G) &= -\log 4 + D_{\text{KL}}\left(p_{\text{data}} \parallel \frac{p_{\text{data}} + p_g}{2}\right) + D_{\text{KL}}\left(p_g \parallel \frac{p_{\text{data}} + p_g}{2}\right) \\
+&= -\log 4 + 2 \cdot D_{\text{JS}}(p_{\text{data}} \parallel p_g)
+\end{aligned}
+$$
+
+where $D_{\text{JS}}$ is the symmetric **Jensen-Shannon Divergence**.
+- The global minimum occurs if and only if $p_g = p_{\text{data}}$.
+- At this equilibrium, $D_{\text{JS}} = 0$, $V(D^*, G) = -\log 4 \approx -1.386$, and $D^*(x) = \frac{1}{2}$ everywhere (the discriminator cannot distinguish real samples from generator fakes).
 
 ---
 
 ## 5. The Non-Saturating Generator Loss Heuristic
 
 In the theoretical minimax formulation, the generator minimizes:
-$$\mathcal{L}_G^{minimax} = \mathbb{E}_{z} [\log (1 - D(G(z)))]$$
+
+$$
+\mathcal{L}_G^{\text{minimax}} = \mathbb{E}_{z} [\log (1 - D(G(z)))]
+$$
 
 ### The Vanishing Gradient Problem
 Early in training, $G$ produces poor images. The discriminator quickly learns to classify them with high confidence ($D(G(z)) \approx 0$).
@@ -176,7 +223,10 @@ As proved by [Arjovsky & Bottou (ICLR 2017)](https://arxiv.org/abs/1701.04862), 
 
 ### The Solution: Non-Saturating Loss
 Goodfellow et al. (2014) proposed that instead of minimizing $\log(1 - D(G(z)))$, the generator should be trained to **maximize $\log D(G(z))$**:
-$$\mathcal{L}_G^{heuristic} = - \mathbb{E}_{z} [\log D(G(z))]$$
+
+$$
+\mathcal{L}_G^{\text{heuristic}} = - \mathbb{E}_{z} [\log D(G(z))]
+$$
 
 This simple flip provides steep, non-vanishing gradients early in training when $D(G(z))$ is near zero, enabling rapid parameter updates and stable convergence.
 
@@ -307,7 +357,10 @@ The conditioning signal $y$ (such as a one-hot class label, text embedding, sema
 - **Discriminator $D(x, y)$:** Evaluates whether the pair $(x, y)$ represents a plausible real data-condition pairing.
 
 The two-player minimax objective becomes:
-$$\min_G \max_D V(D, G) = \mathbb{E}_{(x, y) \sim p_{data}(x, y)} [\log D(x, y)] + \mathbb{E}_{z \sim p_z, y \sim p_y} [\log (1 - D(G(z, y), y))]$$
+
+$$
+\min_G \max_D V(D, G) = \mathbb{E}_{(x, y) \sim p_{\text{data}}(x, y)} [\log D(x, y)] + \mathbb{E}_{z \sim p_z, y \sim p_y} [\log (1 - D(G(z, y), y))]
+$$
 
 ### 8.2 The Dual Task of the Conditional Discriminator
 
@@ -329,17 +382,28 @@ Depending on the modality of $y$, several conditioning techniques are widely emp
    - In the Discriminator: Spatially tile or broadcast the class embedding across image channels and concatenate along the channel dimension ($C + C_y, H, W$).
 2. **Conditional Batch Normalization / AdaIN ([Dumoulin et al., 2017](https://arxiv.org/abs/1610.07629); [Brock et al., 2019](https://arxiv.org/abs/1809.11096)):**
    - Rather than feeding $y$ directly as an input channel, the conditioning vector dynamically modulates the gain ($\gamma(y)$) and bias ($\beta(y)$) parameters of normalization layers:
-     $$\text{CBN}(h \mid y) = \gamma(y) \left( \frac{h - \mu}{\sigma} \right) + \beta(y)$$
+
+$$
+\text{CBN}(h \mid y) = \gamma(y) \left( \frac{h - \mu}{\sigma} \right) + \beta(y)
+$$
+
 3. **Projection Discriminator ([Miyato & Koyama, ICLR 2018](https://arxiv.org/abs/1802.05637)):**
    - Decomposes the discriminator output into an unconditional quality score plus an inner product between the image feature representation $\psi(x)$ and a learned label embedding $\mathbf{v}_y$:
-     $$D(x, y) = \sigma\big(\psi(x)^T \mathbf{v}_y + \phi(\psi(x))\big)$$
+
+$$
+D(x, y) = \sigma\big(\psi(x)^T \mathbf{v}_y + \phi(\psi(x))\big)
+$$
+
    - This formulation guarantees that gradients specifically reinforce class consistency without washing out image realism.
 
 ### 8.4 Seminal Applications: Image-to-Image Translation (Pix2Pix)
 
 When the condition $y$ is an entire image (e.g., edge sketch, black-and-white photo, or depth map), cGANs perform **paired Image-to-Image Translation** ([Isola et al., CVPR 2017](https://arxiv.org/abs/1611.07004) - Pix2Pix):
 - **Objective:** Combines conditional adversarial loss with an explicit pixel-level $L_1$ reconstruction loss to enforce both sharp high-frequency edges and structural layout adherence:
-  $$\mathcal{L}_{Pix2Pix}(G, D) = \mathcal{L}_{cGAN}(G, D) + \lambda \, \mathbb{E}_{x, y, z} \big[ \| x - G(y, z) \|_1 \big]$$
+
+$$
+\mathcal{L}_{\text{Pix2Pix}}(G, D) = \mathcal{L}_{\text{cGAN}}(G, D) + \lambda \, \mathbb{E}_{x, y, z} \big[ \| x - G(y, z) \|_1 \big]
+$$
 - The $L_1$ penalty handles coarse low-frequency correctness (averaging colors and macro structures), while the adversarial discriminator acts as a **PatchGAN** that penalizes blurry, unnatural high-frequency textures.
 
 ---
@@ -379,14 +443,20 @@ When training vanilla Deep Convolutional GANs (DCGAN) on CIFAR-10, students ofte
 
 1. **Receptive Field Overlap in `ConvTranspose2d`:**
    DCGAN generators upsample spatial features using strided transposed 2D convolutions:
-   $$\text{ConvTranspose2d}(\text{in\_channels}, \text{out\_channels}, \text{kernel\_size}=4, \text{stride}=2, \text{padding}=1)$$
+   ```python
+   nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1)
+   ```
    When the kernel size ($k = 4$) is divisible by the stride ($s = 2$), each output pixel receives contributions from varying numbers of overlapping filter windows:
    - Certain pixel positions receive twice as many kernel weight updates as their neighboring pixels.
    - This unequal accumulation produces high-frequency periodic grid noise across the image plane, commonly termed **checkerboard artifacts** ([Odena et al., 2016](https://distill.pub/2016/deconv-checkerboard/)).
 
 2. **Absence of Skip & Residual Connections:**
    Vanilla DCGAN relies on a strictly sequential 4-layer cascade:
-   $$\mathbf{z} \in \mathbb{R}^{100} \to 4\times 4 \times 256 \to 8\times 8 \times 128 \to 16\times 16 \times 64 \to 32\times 32 \times 3$$
+
+$$
+\mathbf{z} \in \mathbb{R}^{100} \to 4\times 4 \times 256 \to 8\times 8 \times 128 \to 16\times 16 \times 64 \to 32\times 32 \times 3
+$$
+
    Without residual skip connections ($\mathbf{x} + \mathcal{F}(\mathbf{x})$), gradients must propagate through every non-linear layer without attenuation. As a result:
    - The network cannot easily preserve high-level semantic layout while simultaneously refining fine edge textures.
    - Deep features quickly suffer from gradient degradation or vanishing signals.
@@ -398,19 +468,34 @@ When training vanilla Deep Convolutional GANs (DCGAN) on CIFAR-10, students ofte
 As proven by Arjovsky & Bottou (2017), real natural images and generated samples lie on low-dimensional submanifolds $\mathcal{M}_r$ and $\mathcal{M}_g$ embedded in high-dimensional ambient space $\mathbb{R}^D$ ($D = 3{,}072$ for CIFAR-10).
 
 1. **Manifold Disjointness:**
-   Because the support of $p_{data}$ and $p_g$ have measure zero with respect to the ambient space, their intersection $\mathcal{M}_r \cap \mathcal{M}_g$ is almost everywhere empty or confined to a set of measure zero:
-   $$\mathbb{P}_{x \sim \text{Lebesgue}}\left( x \in \mathcal{M}_r \cap \mathcal{M}_g \right) = 0$$
+   Because the support of $p_{\text{data}}$ and $p_g$ have measure zero with respect to the ambient space, their intersection $\mathcal{M}_r \cap \mathcal{M}_g$ is almost everywhere empty or confined to a set of measure zero:
+
+$$
+\mathbb{P}_{x \sim \text{Lebesgue}}\left( x \in \mathcal{M}_r \cap \mathcal{M}_g \right) = 0
+$$
 
 2. **Saturation of Jensen-Shannon Divergence:**
    When the manifolds are disjoint, an optimal discriminator $D^*(x)$ perfectly separates real from fake images ($D^*(x) = 1$ on $\mathcal{M}_r$ and $D^*(x) = 0$ on $\mathcal{M}_g$). The Jensen-Shannon Divergence saturates at its theoretical maximum:
-   $$\text{JSD}(p_{data} \parallel p_g) = \log 2$$
+
+$$
+\text{JSD}(p_{\text{data}} \parallel p_g) = \log 2
+$$
+
    Under this condition:
-   $$\nabla_{\theta_g} \text{JSD}(p_{data} \parallel p_g) = \mathbf{0}$$
+
+$$
+\nabla_{\theta_g} \text{JSD}(p_{\text{data}} \parallel p_g) = \mathbf{0}
+$$
+
    The discriminator produces saturated outputs, and the backpropagated gradient signal guiding generator weights vanishes completely ($\nabla_x \log(1 - D(x)) \to \mathbf{0}$).
 
 3. **The Non-Saturating Gradient Tradeoff:**
    While Goodfellow's heuristic non-saturating generator objective ($\max \log D(G(z))$) prevents early vanishing gradients, it introduces an asymmetric penalty:
-   $$\nabla_{\theta_g} \mathcal{L}_G \propto \frac{\nabla_x D(x)}{D(x)}$$
+
+$$
+\nabla_{\theta_g} \mathcal{L}_G \propto \frac{\nabla_x D(x)}{D(x)}
+$$
+
    When $D(x)$ becomes confident ($D(x) \to 0$), the ratio can cause extreme gradient variance and training instability, leading to oscillation or local mode collapse.
 
 ---
@@ -419,14 +504,14 @@ As proven by Arjovsky & Bottou (2017), real natural images and generated samples
 
 To place vanilla DCGAN in context, the table below highlights standard academic benchmarks on CIFAR-10 unconditional and class-conditional generation:
 
-| Model Architecture | Paradigm / Regularizer | Inception Score (IS) $\uparrow$ | Frechet Inception Distance (FID) $\downarrow$ | Key Innovation |
+| Model Architecture | Paradigm / Regularizer | Inception Score (IS) ↑ | Fréchet Inception Distance (FID) ↓ | Key Innovation |
 | :--- | :--- | :---: | :---: | :--- |
-| **Vanilla DCGAN** (Radford et al., 2016) | Standard Minimax, BatchNorm | $\sim 6.4 - 6.6$ | $\sim 35 - 42$ | Deep Convolutional baseline |
-| **WGAN-GP** (Gulrajani et al., 2017) | 1-Lipschitz Penalty via Gradient Norm | $\sim 7.8 - 8.0$ | $\sim 18 - 22$ | Wasserstein metric, stable gradients |
-| **SNGAN** (Miyato et al., 2018) | Spectral Normalization ($\sigma(W) \le 1$) | $\sim 8.2 - 8.6$ | $\sim 14 - 17$ | Matrix power iteration Lipschitz control |
-| **BigGAN** (Brock et al., 2019) | Large-scale ResNet, Self-Attention, CBN | $\sim 9.2 - 9.6$ | $\sim 8.0 - 9.5$ | Scaled batch size, class projection |
-| **EDM / DDPM** (Karras 2022; Ho 2020) | Continuous Denoising Diffusion | $\sim 9.9 - 10.1$ | $\sim 1.9 - 2.5$ | Non-adversarial maximum likelihood |
-| *Real CIFAR-10 Data (Oracle)* | *Empirical ground truth* | *$\sim 11.24$* | *$\mathbf{0.0}$* | *True distribution limit* |
+| **Vanilla DCGAN** (Radford et al., 2016) | Standard Minimax, BatchNorm | ~6.4 – 6.6 | ~35 – 42 | Deep Convolutional baseline |
+| **WGAN-GP** (Gulrajani et al., 2017) | 1-Lipschitz Penalty via Gradient Norm | ~7.8 – 8.0 | ~18 – 22 | Wasserstein metric, stable gradients |
+| **SNGAN** (Miyato et al., 2018) | Spectral Normalization ($\sigma(W) \le 1$) | ~8.2 – 8.6 | ~14 – 17 | Matrix power iteration Lipschitz control |
+| **BigGAN** (Brock et al., 2019) | Large-scale ResNet, Self-Attention, CBN | ~9.2 – 9.6 | ~8.0 – 9.5 | Scaled batch size, class projection |
+| **EDM / DDPM** (Karras 2022; Ho 2020) | Continuous Denoising Diffusion | ~9.9 – 10.1 | ~1.9 – 2.5 | Non-adversarial maximum likelihood |
+| *Real CIFAR-10 Data (Oracle)* | *Empirical ground truth* | *~11.24* | *0.0* | *True distribution limit* |
 
 > [!NOTE]
 > An Inception Score of $\sim 6.5$ for DCGAN after 30–50 epochs accurately reflects the theoretical capability of the architecture. Achieving near-photorealistic CIFAR-10 samples requires residual topologies and strict Lipschitz enforcement.
@@ -442,7 +527,10 @@ How did the machine learning community resolve these limitations after 2016?
 
 2. **Spectral Normalization (SNGAN, Miyato et al., 2018):**
    Normalize the weight matrix of every convolutional layer by its largest singular value (spectral norm $\sigma(W)$):
-   $$\bar{W}_{SN} = \frac{W}{\sigma(W)}, \quad \text{where } \sigma(W) = \max_{h \ne 0} \frac{\|Wh\|_2}{\|h\|_2}$$
+
+$$
+\bar{W}_{\text{SN}} = \frac{W}{\sigma(W)}, \quad \text{where } \sigma(W) = \max_{h \ne 0} \frac{\|Wh\|_2}{\|h\|_2}
+$$
    This restricts the Lipschitz constant of the discriminator without gradient clipping, preventing gradient explosion or saturation.
 
 3. **Residual Discriminator and Generator Blocks (ResNet-GAN):**
