@@ -1,4 +1,4 @@
-# Session 3: Spatio-Temporal Transformers & VideoMAE Foundation Models
+# Session 3: Spatio-Temporal Transformers & Video Foundation Models
 
 - **File**: [`03_video_transformer_inference.py`](../03_video_transformer_inference.py)
 - **Lecture Alignment**: IF5152 Week 11 (Video Transformers & Foundation Models)
@@ -8,202 +8,218 @@
 
 ## 1. Pedagogical Objective
 
-In this lab session, you will explore the modern shift from convolutional and recurrent architectures to **Video Foundation Models**:
-1. **The Architectural Triad**: How Transformer-based video architectures fundamentally differ from 2D/3D Convolutional Neural Networks and Recurrent sequence models (RNN/GRU/LSTM).
-2. **The Dimensional Leap (Image ViT vs. Video Transformers)**: How Vision Transformers adapt from 2D planar images to 3D spatio-temporal video volumes (tubelet embeddings, 3D positional encodings, quadratic complexity walls, temporal redundancy, and readout pooling).
-3. **Space-Time Attention Paradigms**: Comparing **Divided Space-Time Attention** (TimeSformer, ViViT) against **3D Tubelet Masked Autoencoding** (VideoMAE).
-4. **Pretrained VideoMAE Inference**: Running inference with an 86-million parameter model (`MCG-NJU/videomae-base-finetuned-kinetics`) to classify complex human actions across 400 Kinetics categories.
+In this lab session, you will explore the transition from convolutional and recurrent networks to **Spatio-Temporal Vision Transformers**:
+1. **The Intuitive Flaws of Prior Paradigms**: Why CNNs look through "local peepholes" and why RNNs squeeze temporal memory through an "hourglass".
+2. **2D ViT as the Visual Foundation**: How standard Vision Transformers process static images via patch tokenization and self-attention.
+3. **ViViT as the Transfer Learning Bridge**: How the **Video Vision Transformer (ViViT)** elegantly scales 2D ViT to video by factorizing encoders, enabling effortless transfer learning from pretrained 2D ImageNet checkpoints.
+4. **VideoMAE Foundation Models**: How 3D tubelet embeddings and extreme $90\%\text{--}95\%$ tube masking enable self-supervised pre-training on large-scale video.
+5. **Pretrained Inference**: Running a state-of-the-art VideoMAE classifier (`MCG-NJU/videomae-base-finetuned-kinetics`) to recognize fine-grained human actions across 400 Kinetics categories.
 
 ---
 
-## 2. Theoretical Background & Mathematical Foundations
+## 2. Theoretical Background: The Journey to Video Transformers
 
-### 2.1 The Architectural Triad: CNNs vs. Recurrent Models vs. Transformers
+To understand video transformers, we follow a natural 4-stage narrative:
+1. **Act 1**: Why CNNs and RNNs struggle with video (The Peephole vs. The Hourglass).
+2. **Act 2**: The baseline you know — standard 2D Vision Transformers (ViT) on static images.
+3. **Act 3**: The natural extension — ViViT and the transfer learning bridge from 2D ViT.
+4. **Act 4**: The scale frontier — VideoMAE and the $90\%$ tube masking paradox.
 
-To understand why Vision Transformers have become the dominant foundation model for video, we must examine how video representations are constructed across the three major deep learning paradigms:
+---
+
+### 2.1 Act 1: Intuition First — The Problem with Peepholes and Hourglasses
+
+Before transformers, deep video understanding was dominated by two families: **Convolutional Neural Networks (2D/3D CNNs)** and **Recurrent Models (RNN/GRU/LSTM)**. Both impose rigid structural assumptions (inductive biases) that limit their ability to model complex dynamic scenes:
 
 ```mermaid
 flowchart TD
-    subgraph CNN ["1. Convolutional Neural Networks (2D / 3D CNNs)"]
+    subgraph CNN ["1. The 'Local Peephole' Problem (CNNs)"]
         direction TB
-        C1["Input Video Volume"] --> C2["Sliding Conv Kernels (3x3 or 3x3x3)"]
-        C2 --> C3["Strong Inductive Bias: Locality & Translation Equivariance"]
-        C3 --> C4["Receptive field grows linearly: O(L * K)<br/>Early layers strictly confined to local spatial/temporal pixels"]
+        C1["Input Video Volume"] --> C2["Small Sliding Kernels: 3x3 or 3x3x3"]
+        C2 --> C3["Receptive field grows slowly: O(L * K)"]
+        C3 --> C4["Early and mid layers are blind to context across distant regions or distant frames"]
     end
 
-    subgraph RNN ["2. Recurrent Sequence Models (2D CNN + GRU/LSTM)"]
+    subgraph RNN ["2. The 'Hourglass' Bottleneck (RNNs / GRUs)"]
         direction TB
-        R1["Spatial Features per Frame: h_1, h_2, ..., h_T"] --> R2["Markovian Recurrent Step: s_t = f(s_{t-1}, h_t)"]
-        R2 --> R3["Strong Inductive Bias: Sequential Causality & Temporal Order"]
-        R3 --> R4["Sequential Bottleneck: Cannot parallelize across time during training/inference<br/>Information squeezed through fixed-size hidden state"]
+        R1["Frame Representations: h_1, h_2, ..., h_T"] --> R2["Sequential State Step: s_t = GRU(s_{t-1}, h_t)"]
+        R2 --> R3["Memory Bottleneck: Entire video history squeezed into one fixed vector s_t"]
+        R3 --> R4["Sequential Bottleneck: Cannot parallelize across time during training or inference"]
     end
 
-    subgraph XFR ["3. Spatio-Temporal Transformers (Self-Attention)"]
+    subgraph XFR ["3. The 'Full Room' Paradigm (Transformers)"]
         direction TB
-        T1["Sequence of Spatio-Temporal Tokens (Tubes)"] --> T2["Pairwise Dot-Product Attention: Softmax(Q K^T / sqrt(d)) V"]
-        T2 --> T3["Minimal Inductive Bias: Free to learn arbitrary spatiotemporal relations"]
-        T3 --> T4["Global Receptive Field from Layer 1: O(1) operational steps between ANY two patches<br/>Fully parallelized across space and time"]
+        T1["Sequence of Visual Tokens"] --> T2["Pairwise Self-Attention: Softmax(Q K^T / sqrt(d)) V"]
+        T2 --> T3["Global Receptive Field from Layer 1"]
+        T3 --> T4["Every patch in frame t_1 directly talks to any patch in frame t_2 in O(1) steps"]
     end
 ```
 
-#### 1. Inductive Bias & Receptive Field Growth:
-* **CNNs (Sessions 1 & 2)**: Impose strong **hardcoded inductive biases**—namely *spatial locality* (neighboring pixels are related) and *translation equivariance* (features are invariant to spatial translation). A convolutional kernel operates within a fixed receptive field ($3 \times 3$ or $3 \times 3 \times 3$). To model long-range correlations between objects at opposite sides of the frame or between distant frames, the network must stack dozens of layers ($O(L \cdot K)$ growth). Early and intermediate layers cannot capture global spatiotemporal context.
-* **Recurrent Models (Sessions 1 & 5)**: Impose a **sequential Markovian bias** ($\mathbf{s}_t = f(\mathbf{s}_{t-1}, \mathbf{h}_t)$). While this naturally captures sequential order, it creates a severe **information compression bottleneck**: the entire visual history from frame $1$ to $t-1$ must be squeezed into a fixed-dimensional vector $\mathbf{s}_{t-1}$. Furthermore, recurrent updates cannot be parallelized across the time dimension during inference or training.
-* **Transformers (Session 3)**: Discard hardcoded locality and sequentiality assumptions. Every token interacts with every other token via pairwise scaled dot-product attention:
+#### The "Local Peephole" of CNNs:
+* A convolutional filter ($3 \times 3$ or $3 \times 3 \times 3$) only looks at its immediate neighboring pixels.
+* If a person in the top-left corner throws a ball to someone in the bottom-right corner 2 seconds later, early and middle convolutional layers cannot connect these events. The network must stack dozens of layers for their receptive fields to eventually overlap.
+
+#### The "Hourglass" of Recurrent Models:
+* Recurrent networks (like the GRU explored in Session 1 & 5) process video frames sequentially: $\mathbf{s}_t = \mathrm{GRU}(\mathbf{s}_{t-1}, \mathbf{h}_t)$.
+* All visual history from frame $1$ to frame $t-1$ must be squeezed through a single fixed-dimensional vector $\mathbf{s}_{t-1}$.
+* As the video sequence grows, subtle early motions are compressed and forgotten. Furthermore, recurrent steps cannot be parallelized across time—each step must wait for the previous one to complete.
+
+#### The "Full Room" Breakthrough of Transformers:
+* In a Transformer, every visual patch across space and time is placed in the "same room" via **Pairwise Scaled Dot-Product Self-Attention**:
 
 $$
 \text{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \text{Softmax}\left(\frac{\mathbf{Q} \mathbf{K}^\top}{\sqrt{d_k}}\right) \mathbf{V}
 $$
 
-Any spatial patch at frame $t_1$ can directly attend to any other patch at frame $t_2$ in **$\mathcal{O}(1)$ operational steps**, regardless of spatial distance or temporal separation.
-
-#### Comparative Summary Matrix:
-
-| Architectural Family | Temporal Aggregation Mechanism | Inductive Bias | Receptive Field Growth | Time-Parallel Execution | Long-Range Dependency Capacity |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **2D CNN + Late Pooling** | Element-wise mean/max over time | Spatial locality; Permutation-invariant | Local $K \times K$ per frame | Fully parallel across frames | Poor (Cannot model motion order or phase) |
-| **2D CNN + Recurrent (GRU)** | Sequential recurrent state $\mathbf{s}_t$ | Spatial locality; Temporal causality | Local in space; Unbounded in time | Sequential across time steps | Moderate (Suffers from memory compression) |
-| **3D CNN ($R(2+1)D$, $MC3$)** | 3D spatio-temporal convolutions | Joint spatiotemporal locality | Hierarchical: $\mathcal{O}(L \cdot K_t)$ | Fully parallel across clips | Moderate (Bounded by layer receptive field) |
-| **Spatio-Temporal Transformer** | Pairwise Space-Time Self-Attention | Minimal (Learned from data) | **Global from Layer 1** | **Fully parallel across space & time** | **Excellent (Direct patch-to-patch routing)** |
+* Any patch in frame $t_1$ can directly attend to any patch in frame $t_2$ in **$\mathcal{O}(1)$ operational steps**. Attention weights are dynamic and data-dependent: the model routes information based on visual correlation rather than spatial proximity.
 
 ---
 
-### 2.2 The Dimensional Leap: 2D Image Transformers (ViT) vs. 3D Video Transformers
+### 2.2 Act 2: The Baseline You Know — 2D Vision Transformers (ViT)
 
-While both 2D Image Transformers ([Dosovitskiy et al., ICLR 2021](https://arxiv.org/abs/2010.11929)) and Video Transformers operate on tokenized visual inputs, transitioning from a single static image to dynamic video introduces critical structural differences:
+To see how video transformers work, let us first review the standard 2D Vision Transformer ([Dosovitskiy et al., ICLR 2021](https://arxiv.org/abs/2010.11929)):
 
-```mermaid
-flowchart LR
-    subgraph ImageViT ["2D Image Vision Transformer (ViT)"]
-        direction TB
-        Img["Static Image: (3, H, W)"] --> P2D["2D Patch Partition: P x P (16x16)<br/>Conv2d(3, D, 16, 16)"]
-        P2D --> Tok2D["N = 196 Spatial Tokens"]
-        Tok2D --> Pos2D["Add 2D Spatial Positional Embeddings"]
-        Pos2D --> CLS2D["Prepend [CLS] Token -> 197 Tokens"]
-        CLS2D --> Att2D["Standard Self-Attention: O(N^2) = ~38k ops"]
-        Att2D --> Out2D["Readout via [CLS] Token Head"]
-    end
-
-    subgraph VideoXFR ["3D Spatio-Temporal Transformer (VideoMAE)"]
-        direction TB
-        Vid["Video Clip: (16, 3, H, W)"] --> P3D["3D Tubelet Embedding: Pt x P x P (2x16x16)<br/>Conv3d(3, D, (2, 16, 16))"]
-        P3D --> Tok3D["N_video = 8 x 196 = 1,568 Tokens"]
-        Tok3D --> Pos3D["Add 3D Spatio-Temporal Positional Embeddings"]
-        Pos3D --> Mask3D["Pre-training: 90-95% Extreme Tube Masking<br/>Inference: All 1,568 tokens"]
-        Mask3D --> Att3D["Joint Space-Time Self-Attention"]
-        Att3D --> Out3D["Readout via Global Mean Pooling (fc_norm)"]
-    end
-```
-
-#### Contrast 1: Tokenization (2D Planar Patches vs. 3D Tubelets/Cubes)
-* **2D Image ViT**: An image $\mathbf{X}_{\text{img}} \in \mathbb{R}^{C \times H \times W}$ is partitioned into non-overlapping 2D patches of size $P \times P$ (e.g. $16 \times 16$). A 2D convolution (`Conv2d(3, D, kernel=16, stride=16)`) projects each patch to dimension $D=768$:
+1. **Patch Partitioning**: A single 2D image $\mathbf{X} \in \mathbb{R}^{C \times H \times W}$ is split into $N$ non-overlapping planar patches of size $P \times P$ (typically $16 \times 16$):
 
 $$
 N = \frac{H}{P} \times \frac{W}{P} = \frac{224}{16} \times \frac{224}{16} = 14 \times 14 = 196 \text{ tokens}
 $$
 
-* **3D Video Transformer (VideoMAE)**: If we naively treated every 2D patch across all $T$ frames as an independent token, a 16-frame clip would produce $16 \times 196 = 3,136$ tokens. To reduce sequence length, VideoMAE introduces a **3D Tubelet Embedding** (`Conv3d(3, D, kernel=(2, 16, 16), stride=(2, 16, 16))`) that merges temporal slices:
-  - Each tubelet captures $P_t = 2$ consecutive temporal frames across a $16 \times 16$ spatial patch.
-  - The effective temporal sequence length is halved: $T' = T / P_t = 16 / 2 = 8$.
-  - Total tokens:
+2. **Linear Patch Projection**: Each $16 \times 16 \times 3$ patch is flattened and projected into a $D$-dimensional embedding space ($D=768$) using a 2D convolution (`Conv2d(3, 768, kernel_size=16, stride=16)`).
+3. **Positional Encoding & `[CLS]` Token**: 1D/2D spatial positional embeddings are added, and a learnable classification token `[CLS]` is prepended ($\mathbf{z}_0 \in \mathbb{R}^{(N+1) \times D}$).
+4. **Self-Attention Complexity**: Full self-attention across $N=196$ tokens computes an attention matrix of size $196 \times 196$:
 
 $$
-N_{\text{video}} = \left(\frac{T}{P_t}\right) \times \left(\frac{H}{P}\right) \times \left(\frac{W}{P}\right) = 8 \times 14 \times 14 = 1,568 \text{ tokens}
+\text{Operations per head} \approx N^2 = 196^2 = 38,416 \quad \text{(Extremely cheap)}
 $$
 
-#### Contrast 2: Positional Encoding (Spatial vs. Spatio-Temporal)
-* **2D Image ViT**: Uses 2D spatial coordinate embeddings $\mathbf{E}_{\text{pos}} \in \mathbb{R}^{N \times D}$ to inject spatial location ($x, y$).
-* **3D Video Transformer**: Tokens exist at a 3D coordinate $(t, y, x)$. The model must differentiate whether two identical appearance patches occur at the same timestamp or seconds apart. Video transformers use **3D Spatio-Temporal Positional Embeddings**:
+#### The Quadratic Wall when Moving to Video:
+If we naively apply 2D ViT to a video clip of $T=16$ frames by treating every frame patch as an independent token:
 
 $$
-\mathbf{E}_{\text{spatiotemporal}}(t, y, x) = \mathbf{E}_{\text{temp}}(t) + \mathbf{E}_{\text{spatial}}(y, x) \quad \text{or} \quad \text{SinCos3D}(t, y, x)
+N_{\text{video}} = T \times N = 16 \times 196 = 3,136 \text{ tokens}
 $$
 
-#### Contrast 3: The Quadratic Complexity Wall & Attention Scaling
-Self-attention computes pairwise dot-products between all tokens, scaling with $\mathcal{O}(L^2)$ where $L$ is the sequence length:
-* In 2D Image ViT:
-
 $$
-L_{\text{image}} = 196 \implies L^2 = 196^2 = 38,416 \text{ pairwise operations}
+\text{Operations per head} \approx N_{\text{video}}^2 = 3,136^2 \approx 9,834,496 \quad \text{(a } 256\times \text{ compute explosion!)}
 $$
 
-* In 3D Video Transformer:
-
-$$
-L_{\text{video}} = 1,568 \implies L^2 = 1,568^2 \approx 2,458,624 \text{ pairwise operations}
-$$
-
-A 16-frame video clip results in a **$64\times$ explosion in attention compute and activation memory per layer** compared to a single image!
-
-To resolve this quadratic explosion, two primary paradigms exist:
-1. **Factorized (Divided) Space-Time Attention (TimeSformer, ViViT)**: Restricts attention to spatial patches within the same frame ($\mathcal{O}(T \cdot N^2)$), followed by temporal attention across frames for the same spatial coordinate ($\mathcal{O}(N \cdot T^2)$).
-2. **Tubelet Masking + Joint Attention (VideoMAE)**: Retains full joint space-time self-attention, but makes self-supervised pre-training tractable by dropping $90\%\text{--}95\%$ of tokens.
-
-#### Contrast 4: Temporal Redundancy & Masked Pre-Training Dynamics
-Why do Image Masked Autoencoders ([He et al., CVPR 2022](https://openaccess.thecvf.com/content/CVPR2022/html/He_Masked_Autoencoders_Are_Scalable_Vision_Learners_CVPR_2022_paper.html)) and Video Masked Autoencoders ([Tong et al., NeurIPS 2022](https://arxiv.org/abs/2203.12602)) use radically different masking ratios?
-
-* **Image MAE Masking Ratio**: $\approx 75\%$. An image has moderate spatial correlation, so masking 75% forces the model to learn semantic object parts (e.g., predicting an eye given the surrounding face).
-* **VideoMAE Masking Ratio**: **$90\%$ to $95\%$**. 
-  - **The Temporal Redundancy Problem**: Consecutive frames in video recorded at 24–30 FPS are nearly identical. If a video model only masked 75% of tokens with random spatial masking, almost every masked patch would have an unmasked identical counterpart in frame $t-1$ or $t+1$. The model would learn a trivial "copy-paste" shortcut (optical interpolation) rather than learning deep semantics!
-  - **The Tube Masking Solution**: VideoMAE uses **temporally consistent tube masking**: if a spatial patch $(y, x)$ is masked, it is masked across **all time steps** $t = 1, \dots, T$. By combining tube masking with an extreme 90–95% masking ratio, only $5\%\text{--}10\%$ of tokens remain visible during pretraining ($~78\text{--}156$ tokens), making joint space-time attention fast while forcing the network to infer true motion physics and trajectories.
-
-#### Contrast 5: Token Readout (`[CLS]` Token vs. Global Mean Pooling `fc_norm`)
-* **Image ViT**: Traditionally prepends a learnable `[CLS]` token ($\mathbf{x}_{\text{cls}} \in \mathbb{R}^{1 \times D}$) to the input sequence. The final representation of `[CLS]` is routed to the classification MLP.
-* **VideoMAE**: Does not use a `[CLS]` token during masked autoencoding. Instead, after passing all $1,568$ tokens through the 12 transformer encoder blocks, it aggregates the contextualized representations via **Global Sequence Mean Pooling** (`fc_norm`):
-
-$$
-\mathbf{z}_{\text{video}} = \frac{1}{N_{\text{video}}} \sum_{i=1}^{N_{\text{video}}} \mathbf{h}_i \in \mathbb{R}^{D}
-$$
-
-This produces a single 768-dimensional video representation that averages evidence across both space and time before the final linear classification projection.
+Full space-time self-attention quickly exhausts GPU memory. How do we solve this?
 
 ---
 
-### 2.3 Factorized vs. Joint Space-Time Attention Paradigms
+### 2.3 Act 3: The Natural Extension — ViViT & The Transfer Learning Bridge
+
+The most intuitive and practical bridge from 2D ViT to video is **ViViT (Video Vision Transformer)** ([Arnab et al., ICCV 2021](https://arxiv.org/abs/2103.15691)). ViViT shows how to extend 2D ViTs to video with minimal architectural modification.
+
+Among ViViT's design variants, **ViViT Model 2 (The Factorized Encoder)** is the gold standard for **transfer learning and fine-tuning**:
 
 ```mermaid
 flowchart TD
-    V["Raw Video: T=16 Frames"] --> Tub["3D Cube / Tubelet Patch Embedding<br/>Conv3d kernel=(2, 16, 16), stride=(2, 16, 16)"]
-    Tub --> Tok["Sequence of 1,568 Spatio-Temporal Tokens"]
-    Tok --> TA["Transformer Encoder Blocks (12 Layers)"]
-    subgraph AttentionBlock ["Space-Time Self-Attention Paradigms"]
-        TA1["Option 1: Factorized / Divided Attention (TimeSformer, ViViT):<br/>Temporal Attention O(N*T^2) -> Spatial Attention O(T*N^2)"]
-        TA2["Option 2: Joint Space-Time Attention (VideoMAE):<br/>Global Self-Attention O((T*N)^2) with 90% Tube Masking in Pre-Training"]
+    subgraph ViViTFactorized ["ViViT Model 2: Factorized Spatial-Temporal Encoder"]
+        direction TB
+        F1["Frame 1: (3, 224, 224)"] --> S1["Spatial ViT Encoder (Pretrained on ImageNet)<br/>Processes 196 patches + [CLS]"] --> Z1["Frame 1 Spatial Representation: z_1 (768-d)"]
+        F2["Frame 2: (3, 224, 224)"] --> S2["Spatial ViT Encoder (Shared Weights)"] --> Z2["Frame 2 Spatial Representation: z_2 (768-d)"]
+        FT["Frame T: (3, 224, 224)"] --> ST["Spatial ViT Encoder (Shared Weights)"] --> ZT["Frame T Spatial Representation: z_T (768-d)"]
+
+        Z1 --> Seq["Sequence of T Frame Tokens: [T, 768]<br/>+ Prepend Temporal [CLS] + Temporal Positional Embeddings"]
+        Z2 --> Seq
+        ZT --> Seq
+
+        Seq --> TEnc["Temporal Transformer Encoder<br/>(Lightweight: 4 to 6 Layers)<br/>Self-Attention purely across Time: O(T^2)"]
+        TEnc --> TCLS["Temporal [CLS] Output Representation"]
+        TCLS --> Head["Linear Classifier -> Action Logits"]
     end
-    TA --> Pool["Global Sequence Mean Pooling (fc_norm)"]
-    Pool --> Head["Linear Head -> 400 Kinetics Action Classes"]
 ```
 
-To scale Vision Transformers to video, two prominent architectural paradigms have emerged:
+#### How ViViT Factorized Encoder Works (Step-by-Step):
+1. **Spatial Transformer Pass**: Each video frame $t \in \{1, \dots, T\}$ is fed through a standard 2D ViT encoder. It extracts $N=196$ spatial tokens plus a spatial `[CLS]` token. The output of the spatial `[CLS]` token serves as the compact summary vector $\mathbf{z}_t \in \mathbb{R}^D$ for that frame.
+2. **Temporal Transformer Pass**: The sequence of $T$ frame summary vectors $[\mathbf{z}_1, \mathbf{z}_2, \dots, \mathbf{z}_T] \in \mathbb{R}^{T \times D}$ is prepended with a new, learnable **Temporal `[CLS]` Token**, and temporal positional embeddings are added.
+3. **Temporal Attention**: A lightweight temporal transformer (e.g. 4–6 layers) computes self-attention *only along the time dimension*.
+4. **Classification Head**: The final temporal `[CLS]` token is projected to action classes.
 
-1. **Divided (Factorized) Space-Time Attention** — used in **TimeSformer** ([Bertasius et al., ICML 2021](https://arxiv.org/abs/2102.05095)) and **ViViT** ([Arnab et al., ICCV 2021](https://arxiv.org/abs/2103.15691)):
-   Factorizes attention into two sequential steps within each transformer block:
-   - **Temporal Attention**: Each spatial patch attends *only* to patches at the same spatial coordinate across different time frames:
+#### Why ViViT is the King of Transfer Learning & Fine-Tuning:
+> [!TIP]
+> **Zero Weight Surgery from 2D ViT**:
+> * The Spatial Transformer can be initialized **directly from existing ImageNet-pretrained 2D ViT weights** (such as `google/vit-base-patch16-224` or `facebook/deit-base-patch16-224`) without modifying a single weight!
+> * **Ultra-Fast Training**: Just like the feature caching paradigm in Session 5, you can freeze the spatial ViT backbone, pre-extract the frame vectors $\mathbf{z}_1, \dots, \mathbf{z}_T$, and train only the lightweight temporal transformer in minutes on a single GPU/MPS device.
+> * When fine-tuning end-to-end, the spatial encoder already understands object boundaries, textures, and scenes from day one, so the network only needs to learn temporal kinematics.
 
-$$
-\mathcal{O}(N \cdot T^2)
-$$
+#### Alternative: ViViT Model 3 (Factorized Self-Attention / Divided Attention)
+Instead of two separate encoders, ViViT Model 3 (and **TimeSformer** ([Bertasius et al., ICML 2021](https://arxiv.org/abs/2102.05095))) interleaves attention *within every transformer layer*:
+1. **Spatial Attention**: Tokens within the same frame attend to each other ($\mathcal{O}(T \cdot N^2)$).
+2. **Temporal Attention**: Each spatial patch attends only to patches at the same spatial coordinate across different frames ($\mathcal{O}(N \cdot T^2)$).
 
-   - **Spatial Attention**: Tokens within the same frame attend to each other across spatial positions:
+Total complexity drops from $\mathcal{O}(T^2 N^2)$ to $\mathcal{O}(T N^2 + N T^2)$, making deep architectures tractable.
 
-$$
-\mathcal{O}(T \cdot N^2)
-$$
+---
 
-   Total complexity drops from $\mathcal{O}(T^2 N^2)$ to $\mathcal{O}(T N^2 + N T^2)$.
+### 2.4 Act 4: The Scale Frontier — VideoMAE Foundation Models
 
-2. **3D Cube (Tubelet) Embedding + Joint Space-Time Attention** — used in **VideoMAE** ([Tong et al., NeurIPS 2022](https://arxiv.org/abs/2203.12602); extending Masked Autoencoders by [He et al., CVPR 2022](https://openaccess.thecvf.com/content/CVPR2022/html/He_Masked_Autoencoders_Are_Scalable_Vision_Learners_CVPR_2022_paper.html) ([arXiv:2111.06377](https://arxiv.org/abs/2111.06377)) to video):
-   - **3D Cube Embedding (`Conv3d`)**: Uses a 3D convolution with kernel size $2 \times 16 \times 16$ and stride $2 \times 16 \times 16$ to fuse 2 consecutive temporal frames and a $16 \times 16$ spatial patch into a single token, immediately halving the temporal token count $T' = T / 2$.
-   - **Extreme Tube Masking in Pre-Training**: Masks $90\%\text{--}95\%$ of tokens using tube masking during self-supervised reconstruction.
-   - **Full-Token Downstream Evaluation**: During inference on a 16-frame input clip at $224 \times 224$, all $1,568$ tokens are processed jointly and aggregated via **Global Mean Pooling (`fc_norm`)**:
+While ViViT excels at supervised transfer learning from 2D image models, **VideoMAE (Masked Autoencoders for Video)** ([Tong et al., NeurIPS 2022](https://arxiv.org/abs/2203.12602); extending MAE by [He et al., CVPR 2022](https://openaccess.thecvf.com/content/CVPR2022/html/He_Masked_Autoencoders_Are_Scalable_Vision_Learners_CVPR_2022_paper.html)) addresses a bigger question:
+
+> *"How can a Video Transformer learn rich spatiotemporal representations directly from massive unlabelled video datasets without relying on human action labels?"*
+
+VideoMAE introduces three key innovations that powers the checkpoint used in our lab script:
+
+```mermaid
+flowchart TD
+    subgraph VideoMAEPipeline ["VideoMAE Pretraining & Inference Architecture"]
+        direction TB
+        V["Input Video Clip: (16 Frames, 3, 224, 224)"] --> Tube["3D Tubelet Patch Embedding<br/>Conv3d: kernel=(2, 16, 16), stride=(2, 16, 16)"]
+        Tube --> Tokens["Tokens: (16/2) x (224/16)^2 = 8 x 196 = 1,568 Tokens"]
+        
+        Tokens --> PretrainBranch["[Pre-Training Phase: Self-Supervised]"]
+        PretrainBranch --> Mask["90% to 95% Extreme Tube Masking<br/>Only 5-10% (~78-156 tokens) passed to Encoder!"]
+        Mask --> Enc["Vanilla ViT Joint Space-Time Encoder"]
+        Enc --> Dec["Lightweight Decoder -> Reconstruct Masked Pixels"]
+
+        Tokens --> InferBranch["[Downstream Inference Phase: Classification]"]
+        InferBranch --> FullEnc["Full Joint Space-Time Self-Attention across all 1,568 Tokens"]
+        FullEnc --> Pool["Global Sequence Mean Pooling (fc_norm)<br/>Averages across all 1,568 tokens -> [1, 768]"]
+        Pool --> Head["Linear Classifier -> 400 Kinetics Action Classes"]
+    end
+```
+
+#### 1. 3D Tubelet (Cube) Embedding:
+Instead of 2D patches, VideoMAE uses a 3D convolution (`Conv3d(3, 768, kernel=(2, 16, 16), stride=(2, 16, 16))`):
+* It fuses $P_t = 2$ consecutive temporal frames along with a $16 \times 16$ spatial patch into a single initial token.
+* This cuts the temporal sequence length in half:
 
 $$
 \text{Temporal Tokens} = \frac{16}{2} = 8, \quad \text{Spatial Tokens} = \left(\frac{224}{16}\right)^2 = 14 \times 14 = 196
 $$
 
 $$
-\text{Total Tokens} = 8 \times 196 = 1,568 \text{ tokens}
+N_{\text{video}} = 8 \times 196 = 1,568 \text{ tokens}
 $$
+
+#### 2. The $90\%\text{--}95\%$ Masking Paradox:
+In standard Image MAE, masking $\approx 75\%$ of image patches works best. But in VideoMAE, an astonishing **$90\%$ to $95\%$ of video tokens are masked out**! Why?
+
+* **The Temporal Redundancy Problem**: Video recorded at 24–30 FPS has massive frame-to-frame redundancy. If you only mask 75% of patches randomly across space and time, almost every masked patch has an identical duplicate in the preceding or succeeding frame ($t-1$ or $t+1$). The network learns a trivial "copy-paste" interpolation shortcut without learning high-level semantic motion!
+* **The Tube Masking Solution**: VideoMAE enforces **tube masking**—if a spatial patch $(y, x)$ is masked, it is masked across **all time steps** $t=1, \dots, T$.
+* Combined with a $90\%\text{--}95\%$ masking ratio, the network sees only $\approx 78\text{--}156$ visible tokens during pretraining. It can no longer cheat by copying adjacent frames; it must understand physical motion trajectories to reconstruct the video.
+
+#### 3. Inference Readout: Global Mean Pooling (`fc_norm`)
+Unlike 2D ViT which prepends a `[CLS]` token, VideoMAE operates as a pure transformer encoder during pre-training. For downstream classification, all $1,568$ tokens are evaluated jointly and aggregated via **Global Spatio-Temporal Mean Pooling** (`fc_norm`):
+
+$$
+\mathbf{z}_{\text{video}} = \frac{1}{1568} \sum_{i=1}^{1568} \mathbf{h}_i \in \mathbb{R}^{768}
+$$
+
+This robustly aggregates visual evidence across all spatial locations and all time steps before the linear classification head.
+
+---
+
+### 2.5 Master Architectural Cheatsheet
+
+| Model Family | Representative Model | Input Tokenization | Attention Mechanism | Pretraining / Transfer Strategy | Computational Complexity |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **2D Image ViT** | `ViT-Base` ([Dosovitskiy et al., 2021](https://arxiv.org/abs/2010.11929)) | 2D Patches ($16 \times 16$)<br>$N = 196$ tokens | Full 2D Spatial Attention | Supervised on ImageNet / JFT-300M | $\mathcal{O}(N^2)$ (Low) |
+| **ViViT (Factorized Encoder)** | `ViViT Model 2` ([Arnab et al., 2021](https://arxiv.org/abs/2103.15691)) | 2D Patches per frame<br>$T \times 196$ tokens | Spatial ViT on frames $\to$ Temporal ViT on frame `[CLS]` | **Direct transfer learning**: plug in pretrained 2D ViT weights; train temporal head | $\mathcal{O}(T \cdot N^2 + T^2)$ (Very efficient) |
+| **TimeSformer / ViViT Model 3** | `TimeSformer` ([Bertasius et al., 2021](https://arxiv.org/abs/2102.05095)) | 2D Patches per frame<br>$T \times 196$ tokens | Divided Space-Time Attention (interleaved inside blocks) | Spatial weights copied from 2D ViT; temporal attention initialized to zero | $\mathcal{O}(T N^2 + N T^2)$ (Moderate) |
+| **VideoMAE Foundation Model** | `VideoMAE-Base` ([Tong et al., 2022](https://arxiv.org/abs/2203.12602)) | 3D Tubelets ($2 \times 16 \times 16$)<br>$N = 1,568$ tokens | Joint Space-Time Self-Attention | Self-supervised masked autoencoding ($90\%\text{--}95\%$ tube mask) | $\mathcal{O}(N_{\text{video}}^2)$ (Tractable via masking) |
 
 ---
 
@@ -323,12 +339,12 @@ VideoMAE was trained on 16-frame clips sampled at a specific stride.
 1. **Vision Transformer (ViT)**:
    - Dosovitskiy, A., Beyer, L., Kolesnikov, A., Weissenborn, D., Zhai, X., Unterthiner, T., Dehghani, M., Minderer, M., Heigold, G., Gelly, S., Uszkoreit, J., & Houlsby, N. (2021). *An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale*. ICLR 2021.
    - Paper: [arXiv:2010.11929](https://arxiv.org/abs/2010.11929)
-2. **TimeSformer (Divided Space-Time Attention)**:
-   - Bertasius, G., Wang, H., & Torresani, L. (2021). *Is Space-Time Attention All You Need for Video Understanding?*. ICML 2021.
-   - Paper: [arXiv:2102.05095](https://arxiv.org/abs/2102.05095)
-3. **ViViT (Video Vision Transformer)**:
+2. **ViViT (Video Vision Transformer)**:
    - Arnab, A., Dehghani, M., Heigold, G., Sun, C., Lučić, M., & Schmid, C. (2021). *ViViT: A Video Vision Transformer*. ICCV 2021.
    - Paper: [arXiv:2103.15691](https://arxiv.org/abs/2103.15691)
+3. **TimeSformer (Divided Space-Time Attention)**:
+   - Bertasius, G., Wang, H., & Torresani, L. (2021). *Is Space-Time Attention All You Need for Video Understanding?*. ICML 2021.
+   - Paper: [arXiv:2102.05095](https://arxiv.org/abs/2102.05095)
 4. **Masked Autoencoders (MAE)**:
    - He, K., Chen, X., Xie, S., Li, Y., Dollár, P., & Girshick, R. (2022). *Masked Autoencoders Are Scalable Vision Learners*. CVPR 2022, pp. 16000–16009.
    - Paper: [CVPR 2022 OpenAccess](https://openaccess.thecvf.com/content/CVPR2022/html/He_Masked_Autoencoders_Are_Scalable_Vision_Learners_CVPR_2022_paper.html) | [arXiv:2111.06377](https://arxiv.org/abs/2111.06377)
