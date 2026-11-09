@@ -812,6 +812,21 @@ def build_app(device_str: str = None):
                     15: "epoch_15.png",
                     20: "epoch_20.png",
                     25: "epoch_25.png",
+                    30: "epoch_30.png",
+                    35: "epoch_35.png",
+                    40: "epoch_40.png",
+                    45: "epoch_45.png",
+                    50: "epoch_50.png",
+                    55: "epoch_55.png",
+                    60: "epoch_60.png",
+                    65: "epoch_65.png",
+                    70: "epoch_70.png",
+                    75: "epoch_75.png",
+                    80: "epoch_80.png",
+                    85: "epoch_85.png",
+                    90: "epoch_90.png",
+                    95: "epoch_95.png",
+                    100: "epoch_100.png",
                 }
 
                 with gr.Row():
@@ -824,8 +839,8 @@ def build_app(device_str: str = None):
                         cgan_epoch_sel = gr.Dropdown(choices=list(cgan_milestone_files.keys()), value=50, label="cGAN Milestone Epoch")
                         img_cgan_mile = gr.Image(label="cGAN Snapshot")
                     with gr.Column(scale=4):
-                        gr.Markdown("#### 3. SOTA ResNet SNGAN (Projection)")
-                        sngan_epoch_sel = gr.Dropdown(choices=list(sngan_milestone_files.keys()), value=25, label="SNGAN Milestone Epoch")
+                        gr.Markdown("#### 3. SOTA ResNet SNGAN (Projection + EMA)")
+                        sngan_epoch_sel = gr.Dropdown(choices=list(sngan_milestone_files.keys()), value=100, label="SNGAN Milestone Epoch")
                         img_sngan_mile = gr.Image(label="SNGAN Snapshot")
 
                 def load_dcgan_milestone(ep: int):
@@ -839,7 +854,7 @@ def build_app(device_str: str = None):
                     return Image.open(fpath) if os.path.exists(fpath) else None
 
                 def load_sngan_milestone(ep: int):
-                    fname = sngan_milestone_files.get(int(ep), "epoch_25.png")
+                    fname = sngan_milestone_files.get(int(ep), "epoch_100.png")
                     fpath = os.path.join(SNGAN_MILESTONES_DIR, fname)
                     return Image.open(fpath) if os.path.exists(fpath) else None
 
@@ -847,7 +862,7 @@ def build_app(device_str: str = None):
                 cgan_epoch_sel.change(load_cgan_milestone, inputs=cgan_epoch_sel, outputs=img_cgan_mile)
                 sngan_epoch_sel.change(load_sngan_milestone, inputs=sngan_epoch_sel, outputs=img_sngan_mile)
 
-                demo.load(lambda: (load_dcgan_milestone(30), load_cgan_milestone(50), load_sngan_milestone(25)), outputs=[img_dcgan_mile, img_cgan_mile, img_sngan_mile])
+                demo.load(lambda: (load_dcgan_milestone(30), load_cgan_milestone(50), load_sngan_milestone(100)), outputs=[img_dcgan_mile, img_cgan_mile, img_sngan_mile])
 
                 gr.Markdown(
                     """
