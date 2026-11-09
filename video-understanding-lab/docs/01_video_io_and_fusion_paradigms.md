@@ -1,7 +1,7 @@
-# Session 1: Video I/O Bottlenecks, Spatial Backbones, and Late Fusion
+# Session 1: Video I/O Bottlenecks & Spatio-Temporal Fusion Paradigms
 
-- **File**: [`01_video_io_and_late_fusion.py`](../01_video_io_and_late_fusion.py)
-- **Lecture Alignment**: IF5152 Week 11 (Video Understanding Foundations & Late Fusion)
+- **File**: [`01_video_io_and_fusion_paradigms.py`](../01_video_io_and_fusion_paradigms.py)
+- **Lecture Alignment**: IF5152 Week 11 (Video Understanding Foundations & Fusion Paradigms)
 - **Target Hardware**: Apple Silicon (`mps`), NVIDIA Cloud GPU (`cuda`), or CPU fallback (`cpu`)
 
 ---
@@ -12,7 +12,10 @@ In this lab session, you will explore the transition from **2D static image clas
 1. **The Video I/O Decoding Bottleneck**: Why traditional frame-by-frame decoding severely throttles deep learning training pipelines, and how multi-threaded keyframe seeking solves it.
 2. **Video Compression Architecture**: How modern codecs (H.264/HEVC) compress video using Group of Pictures (GOP), I/P/B-frames, and presentation timestamps (PTS).
 3. **5D Video Tensor Mechanics**: How video clips are structured in PyTorch as `[Batch, Time, Channels, Height, Width]`.
-4. **Late Fusion Paradigms**: Comparing order-invariant **Average Pooling** against order-aware **Recurrent GRU Modeling** atop an ImageNet-pretrained 2D CNN backbone.
+4. **Spatio-Temporal Fusion Paradigms (Karpathy et al., CVPR 2014)**: Exploring and benchmarking:
+   - **Early Fusion**: Pixel-level channel stacking into a 2D CNN stem with Channel Weight Inflation.
+   - **Late Fusion (Mean Pooling)**: Order-invariant average pooling over deep 2D backbone spatial representations.
+   - **Late Fusion (Recurrent GRU)**: Order-sensitive temporal hidden state modeling with Gated Recurrent Units.
 
 ---
 
@@ -35,6 +38,7 @@ $$
 $$
 \text{Data throughput} = 6.22 \text{ MB} \times 30 \text{ frames/sec} \approx 186.6 \text{ MB/second}
 $$
+
 * A 10-minute video clip in uncompressed RGB format would consume over **111 Gigabytes** of disk space!
 
 To make storage and internet streaming feasible, all real-world video files are heavily compressed using lossy video codecs (e.g., H.264/AVC ([Wiegand et al., IEEE TCSVT 2003](https://ieeexplore.ieee.org/document/1218189)), H.265/HEVC ([Sullivan et al., IEEE TCSVT 2012](https://ieeexplore.ieee.org/document/6316136)), VP9, AV1).
@@ -104,7 +108,7 @@ However, when training on video clips:
 
 ### 2.5 Algorithmic Comparison of Decoding Approaches
 
-`01_video_io_and_late_fusion.py` implements a live benchmark comparing three distinct decoding algorithms on the exact same video file:
+`01_video_io_and_fusion_paradigms.py` implements a live benchmark comparing three distinct decoding algorithms on the exact same video file:
 
 ```mermaid
 flowchart TD
@@ -187,56 +191,122 @@ $$
 x_{\text{norm}}^{(c)} = \frac{x^{(c)} - \mu^{(c)}}{\sigma^{(c)}}, \quad \mu = [0.485, 0.456, 0.406], \; \sigma = [0.229, 0.224, 0.225]
 $$
 
-4. **The Batch Flattening Trick (Parallel Spatial Feature Extraction)**:
-   A standard 2D CNN (e.g. MobileNetV3 ([Howard et al., ICCV 2019](https://arxiv.org/abs/1905.02244)) or ResNet ([He et al., CVPR 2016](https://arxiv.org/abs/1512.03385))) expects a 4D image input `[Batch, C, H, W]`.
-   Instead of using a Python for-loop over the $T=16$ time steps, we fold the temporal dimension into the batch dimension:
+---
+
+## 3. Spatio-Temporal Fusion Paradigms (Karpathy et al., CVPR 2014)
+
+In their seminal work *"Large-scale Video Classification with Convolutional Neural Networks"*, [Karpathy et al. (CVPR 2014)](https://cs.stanford.edu/people/karpathy/deepvideo/) systematically investigated where and how temporal information should be merged when processing video through 2D convolutional networks.
+
+```mermaid
+flowchart TD
+    subgraph EarlyFusion ["Paradigm 1: Early Fusion (Pixel-Level)"]
+        V1["Video Clip: [B, T, C, H, W]"] --> Stk1["Stack Frames along Channels<br/>[B, T*C, H, W] (e.g. 48 channels)"]
+        Stk1 --> Conv1["Modified Stem Conv2D<br/>in_channels = T * C = 48<br/>Weights Inflated: W_2D / T"]
+        Conv1 --> BB1["Standard 2D Backbone<br/>(1 forward pass for the whole clip!)"]
+        BB1 --> H1["Linear Head -> Classes"]
+    end
+
+    subgraph LateFusionMean ["Paradigm 2: Late Fusion (Temporal Mean)"]
+        V2["Video Clip: [B, T, C, H, W]"] --> Fl2["Fold Time into Batch<br/>[B*T, C, H, W] (16 frames)"]
+        Fl2 --> BB2["Standard 2D Backbone<br/>(16 parallel forward passes)"]
+        BB2 --> Feat2["Frame Features: [B, T, 576]"]
+        Feat2 --> Pool2["Temporal Average Pooling<br/>[B, 576] (Order-invariant)"]
+        Pool2 --> H2["Linear Head -> Classes"]
+    end
+
+    subgraph LateFusionGRU ["Paradigm 3: Late Fusion (Recurrent GRU)"]
+        V3["Video Clip: [B, T, C, H, W]"] --> Fl3["Fold Time into Batch<br/>[B*T, C, H, W]"]
+        Fl3 --> BB3["Standard 2D Backbone<br/>(16 parallel forward passes)"]
+        BB3 --> Feat3["Frame Features: [B, T, 576]"]
+        Feat3 --> GRU3["Recurrent GRU Dynamics<br/>[B, 256] (Order-sensitive)"]
+        GRU3 --> H3["Linear Head -> Classes"]
+    end
+```
+
+---
+
+### 3.1 Paradigm 1: Early Fusion (Channel Stacking at Pixel Level)
+
+In **Early Fusion**, the network merges temporal information immediately at the input layer:
+1. All $T$ frames are stacked along the channel dimension:
+
+$$
+\mathbf{X}_{\text{early}} = \mathbf{X}.\mathrm{view}(B, T \cdot C, H, W) \in \mathbb{R}^{B \times 48 \times 224 \times 224} \quad (\text{for } T=16, C=3)
+$$
+
+2. The first convolutional layer (stem) is replaced with a layer whose `in_channels` is $T \cdot C = 48$ rather than $3$.
+3. **Channel Weight Inflation**:
+   To initialize this new stem layer from an ImageNet-pretrained 2D filter $\mathbf{W}_{\text{2D}} \in \mathbb{R}^{C_{\text{out}} \times 3 \times K_h \times K_w}$, we replicate the 3-channel weights $T$ times across the channel dimension and scale by $1/T$:
+
+$$
+\mathbf{W}_{\text{early}}^{(i, c + (t-1)\cdot 3, y, x)} = \frac{1}{T} \mathbf{W}_{\text{2D}}^{(i, c, y, x)}, \quad \forall t \in \{1, \dots, T\}
+$$
+
+#### The Static Video Invariance Proof:
+Consider a static video where all $T$ frames are identical: $\mathbf{X}(t, c, y, x) = \mathbf{X}_{\text{static}}(c, y, x)$.
+The output of the inflated convolution is:
+
+$$
+\mathbf{Y}_{\text{early}}(i, y, x) = \sum_{t=1}^T \sum_{c=1}^3 \sum_{u, v} \mathbf{X}_{\text{static}}(c, y+u, x+v) \cdot \left(\frac{1}{T} \mathbf{W}_{\text{2D}}(i, c, u, v)\right)
+$$
+
+$$
+= \frac{1}{T} \sum_{t=1}^T \left[ \sum_{c=1}^3 \sum_{u, v} \mathbf{X}_{\text{static}}(c, y+u, x+v) \mathbf{W}_{\text{2D}}(i, c, u, v) \right] = \mathbf{Y}_{\text{2D}}(i, y, x)
+$$
+
+The response on a static video is **mathematically identical** to standard single-frame 2D inference!
+
+#### Computational & Representational Trade-Offs of Early Fusion:
+* **The Speed Advantage**: Notice that after the first convolutional layer, the intermediate tensor shape is $[B, C_1, H_1, W_1]$. The rest of the backbone runs on batch size $B=1$ rather than $B \cdot T = 16$. This makes Early Fusion **$\sim 2.5\times\text{--}3.5\times$ faster** in forward latency than Late Fusion!
+* **The Representation Bottleneck**: All temporal interactions are forced to collapse in the very first layer within a small local kernel ($3 \times 3$). The deeper layers have no direct access to inter-frame correspondences or motion trajectories. As empirically shown by Karpathy et al. (2014), Early Fusion often underperforms on complex motions because subtle temporal signals cannot be resolved by low-level spatial filters alone.
+
+---
+
+### 3.2 Paradigm 2: Late Fusion — Temporal Average Pooling
+
+In **Late Fusion (Mean Pooling)**, the 2D CNN backbone processes all $T$ frames independently using the **Batch Flattening Trick**:
 
 $$
 \mathbf{X}_{\text{flat}} = \mathbf{X}.\mathrm{view}(B \cdot T, C, H, W) \in \mathbb{R}^{16 \times 3 \times 224 \times 224}
 $$
 
-   This allows the GPU/MPS tensor cores to process all 16 frames **simultaneously in parallel**, achieving maximum hardware utilization.
-
----
-
-## 3. Late Fusion Architectures
-
-In their seminal study on large-scale video classification, [Karpathy et al. (CVPR 2014)](https://cs.stanford.edu/people/karpathy/deepvideo/) established that combining frame-level representations via late temporal fusion provides a strong, computationally efficient baseline. Once spatial feature vectors $\mathbf{h}_t \in \mathbb{R}^{576}$ are extracted for each frame $t = 1, \dots, T$, we unflatten the tensor back to `[B, T, D]` and aggregate temporal information before classification:
-
-```mermaid
-flowchart TD
-    V["Raw Video MP4"] --> D["PyAV Fast Keyframe Decode"]
-    D --> S["Uniformly Sampled 16 Frames<br/>Shape: (1, 16, 3, 224, 224)"]
-    S --> F["Flatten to (B*T, C, H, W)"]
-    F --> B["MobileNetV3-Small Backbone<br/>(ImageNet Pretrained)"]
-    B --> E["Extracted Features: (1, 16, 576)"]
-    E --> M1["Option A: Mean Pooling<br/>Mean across T -> (1, 576)"]
-    E --> M2["Option B: GRU Modeling<br/>Hidden state h_T -> (1, 256)"]
-    M1 --> C1["Linear Head -> 10 Classes"]
-    M2 --> C2["Linear Head -> 10 Classes"]
-```
-
-### Strategy A: Temporal Average Pooling
-Compresses the sequence into a single vector by computing the element-wise mean over time:
+The backbone outputs high-level semantic feature vectors $\mathbf{h}_t \in \mathbb{R}^{576}$ for each frame $t$. We then collapse the temporal dimension via average pooling:
 
 $$
 \mathbf{z}_{\text{mean}} = \frac{1}{T} \sum_{t=1}^{T} \mathbf{h}_t \in \mathbb{R}^{D}
 $$
 
 * **Inductive Bias**: Permutation-invariant (shuffling video frames produces the exact same classification prediction).
-* **Pros**: Zero additional parameters, extremely fast, robust for static actions (e.g., *playing cello*, *sitting in classroom*).
+* **Pros**: Zero additional parameters ($932\text{k}$ total), fast, highly robust for static actions (e.g., *playing cello*, *sitting in classroom*).
 * **Cons**: Cannot distinguish irreversible directional actions (e.g., *opening a door* vs *closing a door*).
 
-### Strategy B: Recurrent GRU Temporal Modeling
-Feeds the sequence of vectors into a Gated Recurrent Unit (GRU) ([Cho et al., EMNLP 2014](https://arxiv.org/abs/1406.1078); see also Long-term Recurrent Convolutional Networks by [Donahue et al., CVPR 2015](https://arxiv.org/abs/1411.4389)):
+---
+
+### 3.3 Paradigm 3: Late Fusion — Recurrent GRU Temporal Modeling
+
+Instead of order-invariant pooling, we feed the sequence of frame vectors $[\mathbf{h}_1, \dots, \mathbf{h}_T]$ into a Gated Recurrent Unit ([Cho et al., EMNLP 2014](https://arxiv.org/abs/1406.1078); [Donahue et al., CVPR 2015](https://arxiv.org/abs/1411.4389)):
 
 $$
 \mathbf{s}_t = \mathrm{GRU}(\mathbf{h}_t, \mathbf{s}_{t-1}), \quad \mathbf{z}_{\text{gru}} = \mathbf{s}_T \in \mathbb{R}^{d_h}
 $$
 
-* **Inductive Bias**: Order-sensitive temporal dynamics.
-* **Pros**: Explicitly models sequential transitions and directionality.
-* **Cons**: Sequential computation across time steps; adds model parameters ($3 \times 256 \times (576 + 256 + 2) = 640,512 \approx 640.5\text{k}$ parameters across the 3 GRU gates for input-to-hidden $D=576$, hidden-to-hidden $d_h=256$, and bias terms).
+* **Inductive Bias**: Order-sensitive temporal dynamics via hidden state memory.
+* **Pros**: Explicitly models sequential transitions and motion directionality.
+* **Cons**: Adds recurrent parameters ($3 \times 256 \times (576 + 256 + 2) = 640,512 \approx 640.5\text{k}$ parameters across the 3 GRU gates); higher forward latency ($\approx 65\text{ ms}$ on MPS).
+
+---
+
+### 3.4 Head-to-Head Architectural Comparison
+
+| Dimension | Early Fusion | Late Fusion (Mean) | Late Fusion (GRU) |
+| :--- | :--- | :--- | :--- |
+| **Temporal Merging Point** | Pixel-level (Stem layer `conv1`) | Embedding-level (Post-backbone) | Embedding-level (Post-backbone) |
+| **Stem Input Tensor** | $[B, T \cdot C, H, W] = [1, 48, 224, 224]$ | $[B \cdot T, C, H, W] = [16, 3, 224, 224]$ | $[B \cdot T, C, H, W] = [16, 3, 224, 224]$ |
+| **Backbone Forward Passes** | **$1$ forward pass per video clip** | **$T$ forward passes ($16$ frames)** | **$T$ forward passes ($16$ frames)** |
+| **Total Model Parameters** | $939,258$ ($+6,480$ stem params) | $932,778$ (ImageNet baseline) | $1,570,090$ ($+640\text{k}$ GRU params) |
+| **Forward Latency (Apple MPS)** | **$\approx 14.8\text{ ms}$ (Fastest)** | $\approx 36.5\text{ ms}$ | $\approx 65.8\text{ ms}$ |
+| **Order Sensitivity** | Sensitive to channel ordering | Completely permutation-invariant | Order-sensitive recurrent dynamics |
+| **Pretrained Weight Bootstrap** | Channel Inflation ($\mathbf{W}_{\text{2D}} / T$) | Native ImageNet weights unchanged | Native ImageNet weights unchanged |
 
 ---
 
@@ -248,37 +318,40 @@ $$
 | **Video Decoding** | PyAV Fast Seek | Disk Bitstream | `(16, 360, 640, 3)` | Decoded as uint8 RGB NumPy array |
 | **Preprocessing** | Resizing & Normalization | `16 x [360, 640, 3]` | `[16, 3, 224, 224]` | Scaled to $[0, 1]$ and normalized with ImageNet stats |
 | **Video Batching** | `torch.stack().unsqueeze(0)` | `[16, 3, 224, 224]` | `[1, 16, 3, 224, 224]` | Creates 5D tensor: `[B, T, C, H, W]` |
-| **Backbone Flatten** | `view(B * T, C, H, W)` | `[1, 16, 3, 224, 224]` | `[16, 3, 224, 224]` | Flattens time into batch for parallel 2D convolution |
-| **Spatial Extraction**| MobileNetV3 Backbone | `[16, 3, 224, 224]` | `[16, 576]` | Evaluates spatial features on MPS/CUDA tensor cores |
-| **Unflatten Time** | `view(B, T, -1)` | `[16, 576]` | `[1, 16, 576]` | Restores `[B, T, D]` temporal sequence structure |
-| **Mean Pooling** | `torch.mean(dim=1)` | `[1, 16, 576]` | `[1, 576]` | Time dimension collapsed (Option A) |
-| **GRU Alternative** | `gru(x)[:, -1, :]` | `[1, 16, 576]` | `[1, 256]` | Hidden dimension $d_h = 256$ (Option B) |
-| **Classification Head**| `Linear(D, K)` | `[1, 576]` or `[1, 256]` | `[1, 10]` | Unnormalized class logits |
+| **Early Fusion Stem** | `Conv2D(48, 16, 3)` | `[1, 48, 224, 224]` | `[1, 16, 112, 112]` | Time collapsed immediately in first layer |
+| **Early Backbone** | MobileNetV3 (Single Pass) | `[1, 16, 112, 112]` | `[1, 576]` | Only 1 spatial map processed across all blocks |
+| **Late Backbone** | `view(B*T, 3, 224, 224)` | `[16, 3, 224, 224]` | `[16, 576]` | 16 frames processed in parallel |
+| **Late Mean Pooling** | `torch.mean(dim=1)` | `[1, 16, 576]` | `[1, 576]` | Time dimension collapsed |
+| **Late GRU Head** | `gru(x)[:, -1, :]` | `[1, 16, 576]` | `[1, 256]` | Hidden dimension $d_h = 256$ |
+| **Classification Head** | `Linear(D, K)` | `[1, 576]` or `[1, 256]` | `[1, 10]` | Unnormalized class logits |
 
 ---
 
 ## 5. Execution Playbook
 
-### Running with Default Mean Pooling
+### 1. Comparative Head-to-Head Benchmark Across All Paradigms
 ```bash
-python video-understanding-lab/01_video_io_and_late_fusion.py --video data/person_bicycle.mp4 --fusion mean
+python video-understanding-lab/01_video_io_and_fusion_paradigms.py --video data/person_bicycle.mp4 --fusion all --device mps
 ```
 
-### Running with Recurrent GRU Temporal Head
+### 2. Running Early Fusion
 ```bash
-python video-understanding-lab/01_video_io_and_late_fusion.py --video data/person_bicycle.mp4 --fusion gru
+python video-understanding-lab/01_video_io_and_fusion_paradigms.py --video data/person_bicycle.mp4 --fusion early --device mps
 ```
 
-### Specifying Hardware Accelerators
+### 3. Running Late Fusion (Mean Pooling)
 ```bash
-# Apple Silicon Mac (M1/M2/M3/M4) via Metal Performance Shaders
-python video-understanding-lab/01_video_io_and_late_fusion.py --device mps
+python video-understanding-lab/01_video_io_and_fusion_paradigms.py --video data/person_bicycle.mp4 --fusion mean --device mps
+```
 
-# NVIDIA Cloud GPU / Google Colab via CUDA
-python video-understanding-lab/01_video_io_and_late_fusion.py --device cuda
+### 4. Running Late Fusion (Recurrent GRU)
+```bash
+python video-understanding-lab/01_video_io_and_fusion_paradigms.py --video data/person_bicycle.mp4 --fusion gru --device mps
+```
 
-# Universal CPU Fallback
-python video-understanding-lab/01_video_io_and_late_fusion.py --device cpu
+### 5. Inspecting Detailed Neural Network Architectures
+```bash
+python video-understanding-lab/01_video_io_and_fusion_paradigms.py --fusion early --print-model
 ```
 
 ### CLI Arguments Reference
@@ -287,14 +360,15 @@ python video-understanding-lab/01_video_io_and_late_fusion.py --device cpu
 | :--- | :--- | :--- | :--- |
 | `--video` | `str` | `data/person_bicycle.mp4` | Path to input `.mp4` video file |
 | `--num_frames` | `int` | `16` | Number of frames uniformly sampled across video |
-| `--fusion` | `str` | `mean` | Fusion mechanism: `mean` (Average Pooling) or `gru` (Recurrent) |
+| `--fusion` | `str` | `mean` | Fusion paradigm: `early`, `mean`, `gru`, or `all` |
+| `--print-model` | `flag` | `False` | Print detailed PyTorch neural network layer architecture |
 | `--device` | `str` | `auto` | Target device (`auto`, `mps`, `cuda`, `cpu`) |
 
 ---
 
 ## 6. Expected Terminal Output & Interpretation
 
-When you execute the script, the output displays the three operational phases:
+Running the comparative benchmark (`--fusion all --device mps`) outputs:
 
 ```text
 =================================================================
@@ -306,36 +380,33 @@ When you execute the script, the output displays the three operational phases:
 
 --- [STEP 1] Industrial I/O Decoding Benchmark ---
 Target Video Clip : data/person_bicycle.mp4 (Sample 16 frames)
-  1. OpenCV (Sequential Loop)             : 142.18 ms
-  2. PyAV Naive (Single-threaded Loop)    : 270.77 ms
-  3. PyAV Fast Seek (Industrial Standard) :  36.31 ms
-==> PyAV with Keyframe Seeking is 3.9x faster than OpenCV!
+  1. OpenCV (Sequential Loop)             : 226.38 ms
+  2. PyAV Naive (Single-threaded Loop)    : 367.15 ms
+  3. PyAV Fast Seek (Industrial Standard) :  61.04 ms
+==> PyAV with Keyframe Seeking is 3.7x faster than OpenCV!
 
 --- [STEP 2] Constructing the 5D Video Tensor ---
 Input Video Tensor Shape: (1, 16, 3, 224, 224) (Batch, Time, Channels, Height, Width)
 Tensor VRAM Footprint on MPS: 9408.00 KB
 
---- [STEP 3] Late Fusion Model (MEAN) ---
-Backbone + Fusion Total Parameters : 932,778
+--- [STEP 3] Evaluating Fusion Paradigms (ALL) ---
 
-=================================================================
- MODEL ARCHITECTURE (MEAN FUSION)
-=================================================================
-LateFusionVideoClassifier(
-  (backbone): MobileNetV3(
-    (features): Sequential(
-      ...
-    )
-    (avgpool): AdaptiveAvgPool2d(output_size=1)
-    (classifier): Identity()
-  )
-  (head): Linear(in_features=576, out_features=10, bias=True)
-)
-=================================================================
+========================================================================================
+ HEAD-TO-HEAD COMPARATIVE BENCHMARK: SPATIO-TEMPORAL FUSION PARADIGMS (MPS)
+========================================================================================
+Fusion Strategy    | Stem Input         | Backbone Passes | Params      | Latency (MPS) 
+----------------------------------------------------------------------------------------
+Early Fusion       | [1, 48, 224, 224]  | 1               | 939,258     |  14.76 ms
+Late Fusion (Mean) | [16, 3, 224, 224]  | 16              | 932,778     |  36.53 ms
+Late Fusion (GRU)  | [16, 3, 224, 224]  | 16              | 1,570,090   |  65.83 ms
+========================================================================================
 
-Forward Pass Execution Latency     : 14.85 ms
-Output Logits Tensor Shape         : (1, 10) (Batch, Classes)
-Class Probabilities (Softmax)      : [0.0751 0.0798 0.1328 0.1071 ...]
+Key Pedagogical Takeaways for Students:
+  1. Early Fusion is ~2.5x to ~3.5x faster in forward pass latency because the 2D CNN backbone
+     processes only 1 spatial map ([1, 48, 224, 224]) rather than 16 frames in parallel.
+  2. However, Early Fusion restricts temporal interactions to local 3x3 receptive fields
+     in the stem layer, whereas Late Fusion allows the backbone to extract high-level semantic
+     features before temporal aggregation.
 
 [SUCCESS] Session 1 demo completed.
 ```
@@ -345,18 +416,21 @@ Class Probabilities (Softmax)      : [0.0751 0.0798 0.1328 0.1071 ...]
 ## 7. Self-Study Exercises & Experiments
 
 ### Exercise 1: Temporal Invariance Verification
-1. Open [`01_video_io_and_late_fusion.py`](../01_video_io_and_late_fusion.py) in your editor.
+1. Open [`01_video_io_and_fusion_paradigms.py`](../01_video_io_and_fusion_paradigms.py) in your editor.
 2. Invert the temporal order of frames before model inference:
    ```python
    video_tensor = torch.flip(video_tensor, dims=[1])
    ```
-3. Run both `--fusion mean` and `--fusion gru`.
-4. **Question**: Does the output probability distribution change when frames are reversed in `mean` pooling? What about in `gru`? Why?
+3. Run `--fusion early`, `--fusion mean`, and `--fusion gru`.
+4. **Questions**:
+   - Why does Late Fusion (`mean`) produce the exact same logits when time is reversed?
+   - Does Early Fusion produce different logits when channels are reversed? Why?
+   - How does GRU react to reversing time?
 
 ### Exercise 2: Scaling Number of Frames
 Test the script with `--num_frames 8`, `--num_frames 16`, and `--num_frames 32`:
-* Track both the **I/O decoding time** and the **model forward latency**.
-* Does memory consumption scale linearly with the number of frames?
+* How does the input stem dimension change for Early Fusion ($3 \times 8 = 24$, $3 \times 16 = 48$, $3 \times 32 = 96$)?
+* How does forward pass latency scale for Early Fusion vs Late Fusion?
 
 ---
 
@@ -373,14 +447,14 @@ Test the script with `--num_frames 8`, `--num_frames 16`, and `--num_frames 32`:
 
 ## 📚 References & Canonical Literature
 
-1. **Video Compression & Codec Standards:**
+1. **Large-Scale Video Classification & Fusion Paradigms:**
+   - Karpathy, A., Toderici, G., Shetty, S., Leung, T., Sukthankar, R., & Fei-Fei, L. (2014). "Large-scale Video Classification with Convolutional Neural Networks". *IEEE Conference on Computer Vision and Pattern Recognition (CVPR 2014)*, 1725–1732. [Paper Link](https://cs.stanford.edu/people/karpathy/deepvideo/)
+
+2. **Video Compression & Codec Standards:**
    - Wiegand, T., Sullivan, G. J., Bjøntegaard, G., & Luthra, A. (2003). "Overview of the H.264/AVC Video Coding Standard". *IEEE Transactions on Circuits and Systems for Video Technology (TCSVT)*, 13(7), 560–576. [IEEE Xplore](https://ieeexplore.ieee.org/document/1218189)
    - Sullivan, G. J., Ohm, J. R., Han, W. J., & Wiegand, T. (2012). "Overview of the High Efficiency Video Coding (HEVC) Standard". *IEEE Transactions on Circuits and Systems for Video Technology (TCSVT)*, 22(12), 1649–1668. [IEEE Xplore](https://ieeexplore.ieee.org/document/6316136)
 
-2. **Large-Scale Video Classification & Late Fusion:**
-   - Karpathy, A., Toderici, G., Shetty, S., Leung, T., Sukthankar, R., & Fei-Fei, L. (2014). "Large-scale Video Classification with Convolutional Neural Networks". *IEEE Conference on Computer Vision and Pattern Recognition (CVPR 2014)*, 1725–1732. [Paper Link](https://cs.stanford.edu/people/karpathy/deepvideo/)
-
-3. **2D Deep Backbone Architectures & Datasets:**
+3. **2D Deep Backbone Architectures & Transfer Learning:**
    - Deng, J., Dong, W., Socher, R., Li, L.-J., Li, K., & Fei-Fei, L. (2009). "ImageNet: A Large-Scale Hierarchical Image Database". *IEEE Conference on Computer Vision and Pattern Recognition (CVPR 2009)*. [IEEE Xplore](https://ieeexplore.ieee.org/document/5206848)
    - He, K., Zhang, X., Ren, S., & Sun, J. (2016). "Deep Residual Learning for Image Recognition". *IEEE Conference on Computer Vision and Pattern Recognition (CVPR 2016)*. [https://arxiv.org/abs/1512.03385](https://arxiv.org/abs/1512.03385)
    - Howard, A., et al. (2019). "Searching for MobileNetV3". *IEEE/CVF International Conference on Computer Vision (ICCV 2019)*. [https://arxiv.org/abs/1905.02244](https://arxiv.org/abs/1905.02244)
@@ -388,4 +462,3 @@ Test the script with `--num_frames 8`, `--num_frames 16`, and `--num_frames 32`:
 4. **Recurrent Spatio-Temporal Modeling:**
    - Cho, K., van Merriënboer, B., Gulcehre, C., Bahdanau, D., Bougares, F., Schwenk, H., & Bengio, Y. (2014). "Learning Phrase Representations using RNN Encoder-Decoder for Statistical Machine Translation". *Conference on Empirical Methods in Natural Language Processing (EMNLP 2014)*. [https://arxiv.org/abs/1406.1078](https://arxiv.org/abs/1406.1078)
    - Donahue, J., Anne Hendricks, L., Guadarrama, S., Rohrbach, M., Venugopalan, S., Saenko, K., & Darrell, T. (2015). "Long-term Recurrent Convolutional Networks for Visual Recognition and Description". *IEEE Conference on Computer Vision and Pattern Recognition (CVPR 2015)*. [https://arxiv.org/abs/1411.4389](https://arxiv.org/abs/1411.4389)
-

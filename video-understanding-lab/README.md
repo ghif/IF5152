@@ -17,12 +17,12 @@ IF5152/
 ├── data/                             # Shared course data directory (root level)
 └── video-understanding-lab/          # Week 11 Module
     ├── docs/                         # 📖 In-depth educational notes & self-study guides
-    │   ├── 01_video_io_and_late_fusion.md
+    │   ├── 01_video_io_and_fusion_paradigms.md
     │   ├── 02_spatiotemporal_3d_cnns.md
     │   ├── 03_video_transformer_inference.md
     │   ├── 04_zeroshot_video_search.md
     │   └── 05_train_temporal_head.md
-    ├── 01_video_io_and_late_fusion.py    # Session 1: Video I/O bottleneck & 2D Late Fusion
+    ├── 01_video_io_and_fusion_paradigms.py # Session 1: Video I/O bottleneck & Fusion Paradigms
     ├── 02_spatiotemporal_3d_cnns.py      # Session 2: Spatio-Temporal 3D CNNs (R3D, R(2+1)D, MC3)
     ├── 03_video_transformer_inference.py # Session 3: Pretrained VideoMAE (Kinetics-400)
     ├── 04_zeroshot_video_search.py       # Session 4: Open-Vocabulary Video-Language Matching (CLIP)
@@ -42,7 +42,7 @@ To enable students to learn autonomously, run the code independently, and deeply
 
 | Script | Companion Guide | Core Topics | Key Concepts Covered |
 | :--- | :--- | :--- | :--- |
-| [`01_video_io_and_late_fusion.py`](01_video_io_and_late_fusion.py) | [**`docs/01_video_io_and_late_fusion.md`**](docs/01_video_io_and_late_fusion.md) | Video Tensors & 2D Late Fusion | 5D Video Tensors (`[B, T, C, H, W]`), PyAV Keyframe Seeking benchmark, 2D CNN Backbones, Mean Pooling vs Recurrent GRU |
+| [`01_video_io_and_fusion_paradigms.py`](01_video_io_and_fusion_paradigms.py) | [**`docs/01_video_io_and_fusion_paradigms.md`**](docs/01_video_io_and_fusion_paradigms.md) | Video Tensors & Fusion Paradigms | 5D Video Tensors (`[B, T, C, H, W]`), PyAV Keyframe Seeking benchmark, Early Fusion vs Late Fusion (Mean Pooling & Recurrent GRU) |
 | [`02_spatiotemporal_3d_cnns.py`](02_spatiotemporal_3d_cnns.py) | [**`docs/02_spatiotemporal_3d_cnns.md`**](docs/02_spatiotemporal_3d_cnns.md) | Spatio-Temporal 3D CNNs & Factorization | 3D Volumetric Convolutions, $(2+1)\text{D}$ Spatial-Temporal Factorization, Mixed Convolutions (MC3), I3D Weight Inflation, `[B, C, T, H, W]` layout |
 | [`03_video_transformer_inference.py`](03_video_transformer_inference.py) | [**`docs/03_video_transformer_inference.md`**](docs/03_video_transformer_inference.md) | Spatio-Temporal Attention & VideoMAE | Quadratic complexity of Space-Time Attention, Divided Attention (TimeSformer/VideoMAE), 3D Tubelet embeddings, Kinetics-400 |
 | [`04_zeroshot_video_search.py`](04_zeroshot_video_search.py) | [**`docs/04_zeroshot_video_search.md`**](docs/04_zeroshot_video_search.md) | Multimodal Video-Language & CLIP | Closed-set limits vs Open-vocabulary search, Dual-encoder multimodal matching (CLIP), Unit hypersphere normalization, Vector DB search |
@@ -81,20 +81,26 @@ python download_samples.py
 
 ## 🎓 Curriculum & Live Demo Walkthrough
 
-### Session 1: Video Tensors, The I/O Bottleneck & Late Fusion
-* **Core Topics**: Video Fundamentals, Single-Frame CNN, Early/Late Fusion.
-* **Self-Study Guide**: 📖 [Detailed Notes & Theory Guide](docs/01_video_io_and_late_fusion.md)
-* **Industrial Reality**: Decoding video frames is a major CPU-bound bottleneck in production pipelines. Simple 2D backbone feature extraction with temporal pooling provides a strong, low-latency baseline.
+### Session 1: Video Tensors, The I/O Bottleneck & Fusion Paradigms
+* **Core Topics**: Video Fundamentals, Single-Frame CNN, Early Fusion vs Late Fusion (Mean Pooling & Recurrent GRU).
+* **Self-Study Guide**: 📖 [Detailed Notes & Theory Guide](docs/01_video_io_and_fusion_paradigms.md)
+* **Industrial Reality**: Decoding video frames is a major CPU-bound bottleneck in production pipelines. We benchmark decoding speedups (PyAV fast seek) and compare Early Fusion (pixel-level channel stacking) against Late Fusion (embedding-level temporal pooling & recurrent GRU).
 * **Run Demo**:
   ```bash
-  # Mean pooling
-  python 01_video_io_and_late_fusion.py --fusion mean
+  # Head-to-Head Comparative Benchmark across all paradigms:
+  python 01_video_io_and_fusion_paradigms.py --fusion all --device mps
 
-  # Recurrent temporal head
-  python 01_video_io_and_late_fusion.py --fusion gru
+  # Early Fusion (channel stacking into inflated Conv2d stem)
+  python 01_video_io_and_fusion_paradigms.py --fusion early
+
+  # Late Fusion (temporal mean pooling)
+  python 01_video_io_and_fusion_paradigms.py --fusion mean
+
+  # Late Fusion (recurrent GRU)
+  python 01_video_io_and_fusion_paradigms.py --fusion gru
 
   # Explicit device selection (auto | mps | cuda | cpu)
-  python 01_video_io_and_late_fusion.py --device mps
+  python 01_video_io_and_fusion_paradigms.py --device mps
   ```
 
 ---
@@ -176,7 +182,7 @@ You can run these exact same scripts inside a Google Colab terminal, remote VM, 
 nvidia-smi
 
 # Run scripts with automatic CUDA detection
-python 01_video_io_and_late_fusion.py --device cuda
+python 01_video_io_and_fusion_paradigms.py --device cuda
 python 02_spatiotemporal_3d_cnns.py --model all --device cuda
 python 03_video_transformer_inference.py --device cuda
 python 04_zeroshot_video_search.py --device cuda

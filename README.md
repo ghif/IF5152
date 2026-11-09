@@ -32,8 +32,8 @@ cd video-understanding-lab
 # 3. Download demo media
 python download_samples.py
 
-# 4. Session 1: Video Tensors, I/O Bottlenecks & 2D Late Fusion
-python 01_video_io_and_late_fusion.py --device mps
+# 4. Session 1: Video Tensors, I/O Bottlenecks & Fusion Paradigms
+python 01_video_io_and_fusion_paradigms.py --device mps
 
 # 5. Session 2: Spatio-Temporal 3D CNNs & Factorization Benchmark
 python 02_spatiotemporal_3d_cnns.py --model all --device mps
