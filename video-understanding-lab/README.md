@@ -128,13 +128,23 @@ python download_samples.py
 
 ---
 
-### Session 3: Spatio-Temporal Vision Transformers (VideoMAE)
-* **Core Topics**: Non-Local Blocks, Space-Time Transformers, Divided Attention, 3D Tubelet Embeddings.
-* **Self-Study Guide**: 📖 [VideoMAE Pretrained Transformer Guide](docs/03_video_transformer_inference.md)
-* **Industrial Reality**: Training 3D models from scratch is rare in practice. Industry relies on Video Foundation Models (VideoMAE) pretrained on massive datasets like Kinetics-400.
-* **Run Demo**:
+### Session 3: Spatio-Temporal Vision Transformers (ViViT & VideoMAE)
+* **Core Topics**: Non-Local Blocks, Space-Time Transformers, ViViT Transfer Learning (Model 2 Factorized Encoder), Divided Attention (TimeSformer), 3D Tubelet Embeddings, VideoMAE 90% Masked Autoencoding.
+* **Self-Study Guide**: 📖 [Video Transformers: 2D ViT to ViViT & VideoMAE Guide](docs/03_video_transformer_inference.md)
+* **Industrial Reality**: Training 3D video transformers from scratch is computationally prohibitive. Industry relies either on transfer learning from 2D ViT (ViViT) or foundation models pretrained at scale via self-supervised masked autoencoding (VideoMAE).
+* **Run Demos**:
   ```bash
-  python 03_video_transformer_inference.py --device mps
+  # 1. Head-to-Head Comparative Benchmark (VideoMAE vs ViViT):
+  python 03_video_transformer_inference.py --model all --device mps
+
+  # 2. Run ViViT (32 frames):
+  python 03_video_transformer_inference.py --model vivit --device mps
+
+  # 3. Run VideoMAE (16 frames):
+  python 03_video_transformer_inference.py --model videomae --device mps
+
+  # 4. Inspect PyTorch Educational ViViT Factorized Architecture:
+  python 03_video_transformer_inference.py --print-model
   ```
 
 ---

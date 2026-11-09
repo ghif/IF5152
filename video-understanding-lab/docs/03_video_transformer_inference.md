@@ -239,70 +239,149 @@ This robustly aggregates visual evidence across all spatial locations and all ti
 
 ## 4. Execution Playbook
 
-### Running on Default Apple Silicon / Automatic Hardware
+### 1. Default VideoMAE Inference (16 Frames)
 ```bash
 python 03_video_transformer_inference.py --video data/person_bicycle.mp4
 ```
 
-### Running on Dedicated GPU / MPS
+### 2. ViViT Inference (32 Frames on Apple Silicon MPS or CUDA)
 ```bash
-# Apple Silicon
-python 03_video_transformer_inference.py --video data/person_bicycle.mp4 --device mps
+# Apple Silicon GPU
+python 03_video_transformer_inference.py --model vivit --device mps
 
 # NVIDIA Cloud GPU
-python 03_video_transformer_inference.py --video data/person_bicycle.mp4 --device cuda
+python 03_video_transformer_inference.py --model vivit --device cuda
+```
+
+### 3. Head-to-Head Comparative Benchmark (VideoMAE vs ViViT)
+Run both foundation models side-by-side on the exact same video clip:
+```bash
+python 03_video_transformer_inference.py --model all --device mps
+```
+
+### 4. Inspect Educational ViViT Factorized Architecture
+Inspect the PyTorch implementation of ViViT Model 2 (2D ViT spatial backbone + lightweight temporal transformer encoder):
+```bash
+python 03_video_transformer_inference.py --print-model
 ```
 
 ### CLI Arguments Reference
 
-| Flag | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `--video` | `str` | `data/person_bicycle.mp4` | Path to input `.mp4` video clip |
-| `--model` | `str` | `MCG-NJU/videomae-base-finetuned-kinetics` | Hugging Face model repository ID |
-| `--num_frames` | `int` | `16` | Number of input frames (standard for VideoMAE is 16) |
-| `--device` | `str` | `auto` | Target device (`auto`, `mps`, `cuda`, `cpu`) |
+| Flag | Type | Default | Choices / Format | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `--video` | `str` | `data/person_bicycle.mp4` | File path | Path to input `.mp4` video clip |
+| `--model` | `str` | `videomae` | `videomae`, `vivit`, `all`, `custom` | Selects which architecture to execute or benchmark |
+| `--custom_checkpoint` | `str` | `None` | Hugging Face Repo ID | Optional custom Hugging Face model repository ID |
+| `--num_frames` | `int` | `None` | Integer | Frames to sample (defaults: VideoMAE = 16, ViViT = 32) |
+| `--device` | `str` | `auto` | `auto`, `mps`, `cuda`, `cpu` | Target compute hardware accelerator |
+| `--print-model` | `flag` | `False` | Boolean | Prints educational `ViViTFactorizedModel` architecture |
 
 ---
 
-## 5. Expected Output & Interpretation
+## 5. Expected Output & Empirical Benchmarking
 
-Running the script on the demo video (`person_bicycle.mp4`) yields:
+### 5.1 Head-to-Head Benchmark Output (`--model all`)
+
+Running `--model all --device mps` produces a side-by-side evaluation and comparison:
 
 ```text
-==================================================
-Hardware Acceleration: Apple Silicon Metal (MPS)
-PyTorch Version:       2.X.X
-==================================================
+=================================================================
+ PyTorch Version : 2.X.X
+ Active Device   : MPS
+ Backend         : Apple Silicon Metal Performance Shaders (MPS)
+ Note            : Leveraging Unified Memory Architecture (UMA)
+=================================================================
 
---- [STEP 1] Loading Preprocessor for 'MCG-NJU/videomae-base-finetuned-kinetics' ---
+======================================================================
+ HEAD-TO-HEAD BENCHMARK: VideoMAE vs ViViT
+======================================================================
+Decoding 32 frames from 'data/person_bicycle.mp4' for synchronized evaluation...
 
---- [STEP 2] Decoding Video Clip ---
-Sampling 16 frames from 'data/person_bicycle.mp4'...
-Raw decoded array shape: (16, 360, 640, 3) (Frames, Height, Width, RGB Channels)
-Processed Transformer Input Tensor: (1, 16, 3, 224, 224)
+--- Loading VideoMAE Preprocessor & Weights: 'MCG-NJU/videomae-base-finetuned-kinetics' ---
+VideoMAE Parameters : 86,534,800
+Input Frames        : 16 frames -> Tubelet (2x16x16) -> 1,568 tokens
 
---- [STEP 3] Loading Pretrained VideoMAE Model onto MPS ---
-Total Model Parameters: 86,527,120 (Pretrained on 400 Kinetics Action Classes)
+========================================================
+ VIDEOMAE TOP-5 PREDICTIONS
+========================================================
+  #1  hurdling                     :  4.70%  █
+  #2  hopscotch                    :  3.75%  █
+  #3  shooting goal (soccer)       :  2.32%  
+  #4  building shed                :  2.19%  
+  #5  triple jump                  :  1.96%  
+========================================================
 
---- [STEP 4] Running Spatio-Temporal Attention Forward Pass ---
-Forward Pass Latency: 112.40 ms
+--- Loading ViViT Preprocessor & Weights: 'google/vivit-b-16x2-kinetics400' ---
+ViViT Parameters    : 88,954,000
+Input Frames        : 32 frames -> Tubelet (2x16x16) -> 3,136 tokens
 
-==================================================
- TOP-5 KINETICS-400 ACTION PREDICTIONS
-==================================================
-  #1  riding a bike                  : 88.42%  ███████████████████████████████████
-  #2  biking through snow            :  6.15%  ██
-  #3  unicycling                     :  1.82%  
-  #4  doing motocross                :  0.94%  
-  #5  riding scooter                 :  0.41%  
-==================================================
+========================================================
+ VIVIT TOP-5 PREDICTIONS
+========================================================
+  #1  pushing car                  : 94.76%  █████████████████████████████████
+  #2  throwing ball                :  1.32%  
+  #3  riding unicycle              :  0.44%  
+  #4  catching or throwing frisbee :  0.42%  
+  #5  passing American football (not in game) :  0.35%  
+========================================================
 
-[SUCCESS] Session 3 (Video Transformer) demo completed.
+============================================================================
+                ARCHITECTURAL & PERFORMANCE COMPARISON TABLE                
+============================================================================
+ Metric / Property        | VideoMAE (Tong 2022)    | ViViT (Arnab 2021)    
+----------------------------------------------------------------------------
+ Input Frames (T)         | 16                      | 32                    
+ Tubelet Size             | 2 x 16 x 16             | 2 x 16 x 16           
+ Spatiotemporal Tokens    | 1,568 tokens            | 3,136 tokens          
+ Total Parameters         | 86,534,800              | 88,954,000            
+ Inference Latency        | 608.1 ms                | 1276.4 ms             
+ Top-1 Predicted Class    | hurdling                | pushing car           
+ Top-1 Confidence         | 4.70%                   | 94.76%                
+============================================================================
+
+[Pedagogical Takeaway for Students]
+  - ViViT processes 32 frames (3,136 tokens), resulting in a ~2.1x latency scaling
+    over VideoMAE's 16 frames (1,568 tokens), demonstrating the quadratic O(N^2) token attention cost.
+  - ViViT provides seamless transfer learning from 2D ViT weights, whereas VideoMAE
+    is optimized through large-scale self-supervised masked pretraining at 90% masking ratio.
+
+[SUCCESS] Session 3 (Video Transformer) lab execution completed.
 ```
 
-### Key Takeaways:
-1. **High Confidence on Complex Motion**: Unlike single-frame classifiers that might confuse a stationary bicycle with riding, the spatio-temporal attention mechanism successfully captures the dynamic pedaling motion and scene translation.
-2. **Kinetics-400 Granularity**: The top predictions reflect fine-grained motion categories in the Kinetics benchmark (`riding a bike`, `biking through snow`, `unicycling`).
+### 5.2 Educational PyTorch Model Inspection (`--print-model`)
+
+Running `--print-model` inspects the factorized modular structure:
+
+```text
+======================================================================
+ EDUCATIONAL PYTORCH IMPLEMENTATION: ViViT MODEL 2 (FACTORIZED ENCODER)
+======================================================================
+ViViTFactorizedModel(
+  (spatial_encoder): VisionTransformer(
+    (conv_proj): Conv2d(3, 768, kernel_size=(16, 16), stride=(16, 16))
+    (encoder): Encoder(
+      (layers): Sequential( 12 x EncoderBlock(...) )
+      (ln): LayerNorm((768,), eps=1e-06)
+    )
+    (heads): Identity()
+  )
+  (pos_drop): Dropout(p=0.1, inplace=False)
+  (temporal_transformer): TransformerEncoder(
+    (layers): ModuleList( 4 x TransformerEncoderLayer(...) )
+  )
+  (norm): LayerNorm((768,), eps=1e-05)
+  (classifier): Linear(in_features=768, out_features=400, bias=True)
+)
+----------------------------------------------------------------------
+Total Parameters     : 114,509,968
+Spatial Backbone     : 85,798,656 params (Directly transferable from 2D ViT!)
+Temporal Transformer : 28,351,488 params (Lightweight inter-frame self-attention)
+======================================================================
+```
+
+### Key Pedagogical Takeaways:
+1. **Quadratic Scaling in Action**: Doubling the frame count from 16 to 32 doubles the token sequence length ($1,568 \to 3,136$), increasing attention FLOPs by $4\times$ and driving latency from ~600 ms to ~1280 ms.
+2. **Transfer Learning Efficiency**: The spatial backbone of ViViT comprises ~85.8M parameters (75% of the total network) that can be initialized completely frozen from any standard 2D ViT checkpoint, leaving only ~28.4M parameters in the temporal transformer to train.
 
 ---
 

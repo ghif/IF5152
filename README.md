@@ -10,7 +10,7 @@ Welcome to the course repository for **IF5152 (Advanced Computer Vision)**. This
 | Module / Directory | Topic | Key Concepts | Hardware Support |
 | :--- | :--- | :--- | :--- |
 | **[`generative-models/`](./generative-models)** | **Generative Models (Lecture 13 & 14)** | Exact Likelihood (PixelCNN), Latent Failure Modes (Vanilla AE), ELBO & Reparameterization (VAE), Minimax Game (DCGAN), Iterative Denoising (DDPM) | Apple Silicon (MPS), NVIDIA GPU (CUDA), CPU |
-| **[`video-understanding-lab/`](./video-understanding-lab)** | **Video Understanding (Week 11)** | Video I/O bottlenecks, Late Fusion, 3D Spatio-Temporal CNNs (R3D, R(2+1)D, MC3), Video Transformers (VideoMAE), Zero-Shot CLIP Search, Local M4 MPS Training | Apple Silicon (MPS), NVIDIA GPU (CUDA), CPU |
+| **[`video-understanding-lab/`](./video-understanding-lab)** | **Video Understanding (Week 11)** | Video I/O bottlenecks, Early & Late Fusion, 3D Spatio-Temporal CNNs (R3D, R(2+1)D, MC3), Video Transformers (ViViT & VideoMAE), Zero-Shot CLIP Search, Local M4 MPS Training | Apple Silicon (MPS), NVIDIA GPU (CUDA), CPU |
 
 ---
 
@@ -38,8 +38,8 @@ python 01_video_io_and_fusion_paradigms.py --device mps
 # 5. Session 2: Spatio-Temporal 3D CNNs & Factorization Benchmark
 python 02_spatiotemporal_3d_cnns.py --model all --device mps
 
-# 6. Session 3: Spatio-Temporal Vision Transformers (VideoMAE)
-python 03_video_transformer_inference.py --device mps
+# 6. Session 3: Spatio-Temporal Vision Transformers (ViViT & VideoMAE)
+python 03_video_transformer_inference.py --model all --device mps
 
 # 7. Session 4: Open-Vocabulary Multimodal Video Search (CLIP)
 python 04_zeroshot_video_search.py --device mps
