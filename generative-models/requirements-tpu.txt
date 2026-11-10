@@ -1,0 +1,7 @@
+# TorchTPU 0.2.0 requires PyTorch 2.11–2.15 and its CPU wheel index.
+# Install with: python -m pip install -r requirements-tpu.txt
+--extra-index-url https://download.pytorch.org/whl/cpu
+-r requirements.txt
+torch==2.15.0
+torchvision==0.29.2+cpu
+torch-tpu==0.2.0

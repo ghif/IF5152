@@ -1,6 +1,6 @@
 """
 Shared utilities for IF5152 Generative Models Laboratory.
-Supports Apple Silicon (MPS), NVIDIA CUDA, and CPU.
+Supports NVIDIA CUDA, Google TorchTPU, Apple Silicon (MPS), and CPU.
 """
 
 import os
@@ -12,15 +12,31 @@ from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
 
 
+def _tpu_is_available() -> bool:
+    """Return whether the optional TorchTPU backend is registered and usable."""
+    accelerator = getattr(torch, "accelerator", None)
+    if accelerator is None:
+        return False
+    try:
+        return (
+            accelerator.is_available()
+            and accelerator.current_accelerator().type == "tpu"
+        )
+    except (RuntimeError, AttributeError):
+        return False
+
+
 def get_device(preferred: Optional[str] = None) -> torch.device:
     """
     Selects the optimal compute device.
-    Priority if None: CUDA -> MPS (Apple Silicon) -> CPU.
+    Priority if None: CUDA -> TPU -> MPS (Apple Silicon) -> CPU.
     """
     if preferred:
         pref = preferred.lower()
         if pref == "cuda" and torch.cuda.is_available():
             return torch.device("cuda")
+        elif pref == "tpu" and _tpu_is_available():
+            return torch.device("tpu")
         elif pref == "mps" and torch.backends.mps.is_available():
             return torch.device("mps")
         elif pref == "cpu":
@@ -29,6 +45,8 @@ def get_device(preferred: Optional[str] = None) -> torch.device:
 
     if torch.cuda.is_available():
         return torch.device("cuda")
+    elif _tpu_is_available():
+        return torch.device("tpu")
     elif torch.backends.mps.is_available():
         return torch.device("mps")
     return torch.device("cpu")

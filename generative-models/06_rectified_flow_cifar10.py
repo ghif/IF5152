@@ -774,7 +774,7 @@ def main():
     parser.add_argument("--no-fp16", action="store_true", help="Disable CUDA mixed precision FP16 (enabled by default on NVIDIA GPUs)")
     parser.add_argument("--checkpoint-dir", type=str, default=None, help="Directory to save checkpoints (default: checkpoints/)")
     parser.add_argument("--samples-dir", type=str, default=None, help="Directory to save generated sample images (default: samples/)")
-    parser.add_argument("--device", type=str, default=None, help="Device to use (cuda/mps/cpu)")
+    parser.add_argument("--device", type=str, default=None, help="Device to use (cuda/tpu/mps/cpu)")
     parser.add_argument("--resume", action="store_true", help="Resume from last checkpoint")
     parser.add_argument("--quick-test", action="store_true", help="Quick smoke test (1 epoch, 50 samples)")
     parser.add_argument("--eval-grid", action="store_true", help="Generate 10x10 class grid from saved checkpoint")
