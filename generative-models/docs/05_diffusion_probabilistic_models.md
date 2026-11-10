@@ -226,10 +226,93 @@ To overcome the pixel-space computational cost of high-resolution diffusion, mod
 
 ---
 
-## 7. Summary & Reading Guide
+## 7. Generalized Diffusion: The Rectified Flow & Flow Matching Perspective
 
-- **Reference Code ([`05_denoising_diffusion_model.py`](../05_denoising_diffusion_model.py)):** Hands-on PyTorch DDPM implementation featuring forward noising, U-Net with sinusoidal timestep embeddings, and reverse ancestral sampling.
-- **Top-Level Lab Overview ([`README.md`](../README.md)):** Master comparison table covering all five generative paradigms.
+In recent breakthroughs featured in modern foundation models (such as Stable Diffusion 3, Flux, and Movie Gen) and discussed in **Lecture 13 (Slides 180–181 & 204–212)**, diffusion is generalized through the lens of **Rectified Flow** ([Liu, Gong, & Liu, ICLR 2023](https://arxiv.org/abs/2209.03003); [Lipman et al., ICLR 2023](https://arxiv.org/abs/2210.02747); [Esser et al., 2024](https://arxiv.org/abs/2403.03206)).
+
+```mermaid
+flowchart LR
+    subgraph DDPM_Path ["DDPM / SDE: Curved Stochastic Hypersphere Path"]
+        A["Data x_0"] -.-> B["Curved Brownian Path"] -.-> C["Noise x_T"]
+    end
+
+    subgraph RF_Path ["Rectified Flow: Deterministic Straight-Line Path"]
+        D["Data x (t=0)"] ===|"dx/dt = v_gt = z - x"| E["x_t = (1 - t)x + tz"] ===|"Constant Velocity"| F["Noise z ~ N(0, I) (t=1)"]
+    end
+```
+
+### 7.1 The Straight-Line Interpolation Trajectory
+
+Unlike traditional DDPM, which introduces curvature via trigonometric variance-preserving schedules ($x_t = \sqrt{\bar{\alpha}_t} x + \sqrt{1 - \bar{\alpha}_t} \epsilon$), Rectified Flow connects data $x \sim p_{\text{data}}$ and standard normal noise $z \sim \mathcal{N}(0, \mathbf{I})$ along a straight line:
+
+$$
+x_t = (1 - t) x + t z, \quad \text{for } t \in [0, 1]
+$$
+
+- At $t = 0$: $x_0 = x$ (authentic data image).
+- At $t = 1$: $x_1 = z$ (standard Gaussian noise).
+
+### 7.2 Constant Ground-Truth Velocity ($v_{\text{gt}}$)
+
+Taking the analytical time derivative of the straight trajectory yields a constant velocity field:
+
+$$
+v_{\text{gt}} = \frac{d x_t}{d t} = \frac{d}{dt}\big((1 - t) x + t z\big) = z - x
+$$
+
+The neural network $v_\theta(x_t, t, y)$ is trained to match this velocity field directly via standard mean squared error (MSE):
+
+$$
+\mathcal{L}_{\text{RF}}(\theta) = \mathbb{E}_{x \sim p_{\text{data}}, \, z \sim \mathcal{N}(0, \mathbf{I}), \, t \sim p(t)} \Big[ \| v_\theta(x_t, t, y) - (z - x) \|_2^2 \Big]
+$$
+
+### 7.3 Classifier-Free Guidance (CFG) in Velocity Space
+
+Following the formulation in Lecture Slides 161–169:
+1. **Training:** With probability $p_{\text{uncond}} = 0.15$, the class label $y$ is dropped and replaced with the unconditional token $y_\emptyset = 10$.
+2. **Inference:** The guided velocity vector $v_{\text{cfg}}$ pushes the trajectory away from the unconditioned density and toward the conditioned class distribution:
+
+$$
+v_{\text{cfg}}(x_t, t, y) = v_\theta(x_t, t, y_\emptyset) + s \cdot \big(v_\theta(x_t, t, y) - v_\theta(x_t, t, y_\emptyset)\big)
+$$
+
+where $s = 1 + w$ is the guidance scale (e.g. $s = 2.0$).
+
+### 7.4 Reverse Generation via Numerical ODE Solvers
+
+To synthesize a new image, we start from pure noise $x_1 \sim \mathcal{N}(0, \mathbf{I})$ at $t = 1$ and numerically integrate the probability flow ordinary differential equation (ODE) backwards to $t = 0$:
+
+$$
+\frac{d x_t}{d t} = v_\theta(x_t, t, y) \implies d x = v_\theta \, dt
+$$
+
+Because the trajectories are rectified (straightened), numerical ODE solvers can advance with large step sizes $\Delta t$:
+- **First-Order Euler Solver** ($\Delta t = 1/N$):
+  $$x_{t - \Delta t} = x_t - \Delta t \cdot v_{\text{cfg}}(x_t, t, y)$$
+- **Second-Order Heun Predictor-Corrector Solver**:
+  $$d_1 = v_{\text{cfg}}(x_t, t, y)$$
+  $$\hat{x} = x_t - \Delta t \cdot d_1$$
+  $$d_2 = v_{\text{cfg}}(\hat{x}, t - \Delta t, y)$$
+  $$x_{t - \Delta t} = x_t - \frac{\Delta t}{2} (d_1 + d_2)$$
+
+### 7.5 Comparison Matrix: DDPM vs. Rectified Flow
+
+| Feature / Property | DDPM (Ho et al. 2020) | Rectified Flow (Liu et al. 2023 / SD3) |
+| :--- | :--- | :--- |
+| **Trajectory Geometry** | Curved stochastic Markov chain | **Straight deterministic linear path** |
+| **Interpolant** | $x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon$ | **$x_t = (1 - t) x + t z$** |
+| **Training Target** | Injected Gaussian noise $\epsilon$ | **Velocity field $v = z - x$** |
+| **Sampling Mechanism** | Stochastic Langevin SDE / Ancestral | **Deterministic ODE Integration** |
+| **NFE (Steps to Sample)** | 50–1000 steps | **10–30 steps (Euler / Heun)** |
+| **Industry Adoption** | Stable Diffusion 1.5 / 2.1 | **Stable Diffusion 3, Flux, Movie Gen** |
+
+---
+
+## 8. Summary & Reading Guide
+
+- **Reference Code (DDPM/DDIM: [`05_denoising_diffusion_model.py`](../05_denoising_diffusion_model.py)):** Hands-on PyTorch DDPM implementation featuring forward noising, U-Net with sinusoidal timestep embeddings, and reverse ancestral/DDIM sampling.
+- **Reference Code (Rectified Flow: [`06_rectified_flow_cifar10.py`](../06_rectified_flow_cifar10.py)):** Class-conditional Rectified Flow with straight-line interpolation, velocity matching, CFG, and Euler/Heun ODE solvers.
+- **Top-Level Lab Overview ([`README.md`](../README.md)):** Master comparison table covering all generative paradigms.
 
 ---
 
@@ -253,3 +336,8 @@ To overcome the pixel-space computational cost of high-resolution diffusion, mod
 
 5. **Latent Diffusion & High-Resolution Synthesis:**
    - Rombach, R., Blattmann, A., Lorenz, D., Esser, P., & Ommer, B. (2022). "High-Resolution Image Synthesis with Latent Diffusion Models". *IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR 2022)*. [https://arxiv.org/abs/2112.10752](https://arxiv.org/abs/2112.10752)
+
+6. **Rectified Flow & Flow Matching:**
+   - Liu, X., Gong, C., & Liu, Q. (2023). "Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow". *International Conference on Learning Representations (ICLR 2023)*. [https://arxiv.org/abs/2209.03003](https://arxiv.org/abs/2209.03003)
+   - Lipman, Y., Chen, R. T. Q., Ben-Hamu, H., Nicklas, M., & Le, M. (2023). "Flow Matching for Generative Modeling". *International Conference on Learning Representations (ICLR 2023)*. [https://arxiv.org/abs/2210.02747](https://arxiv.org/abs/2210.02747)
+   - Esser, P., Kulal, S., Blattmann, A., Entezari, R., Müller, J., Saini, H., Levi, Y., Lorenz, D., Sauer, A., Boesel, F., Podell, D., Dockhorn, T., Zheng, Z., & Ommer, B. (2024). "Scaling Rectified Flow Transformers for High-Resolution Image Synthesis". *arXiv:2403.03206*. [https://arxiv.org/abs/2403.03206](https://arxiv.org/abs/2403.03206)

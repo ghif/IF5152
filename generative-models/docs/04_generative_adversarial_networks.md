@@ -396,6 +396,25 @@ $$
 
    - This formulation guarantees that gradients specifically reinforce class consistency without washing out image realism.
 
+4. **Auxiliary Classifier GAN (AC-GAN, [Odena et al., ICML 2017](https://arxiv.org/abs/1610.09585)):**
+   - The discriminator receives the RGB image $x$ alone ($3 \times H \times W$), with **no class channel concatenated into the input**.
+   - Instead, the discriminator branches into two distinct output heads:
+     1. **Adversarial Head $D_S(x) \in [0, 1]$**: Predicts whether $x$ is real or generated.
+     2. **Auxiliary Classifier Head $D_C(x) \in \Delta^K$**: Predicts the probability distribution over the $K$ classes.
+   - The training objective combines the log-likelihood of the source ($\mathcal{L}_S$) and class ($\mathcal{L}_C$):
+
+$$
+\mathcal{L}_S = \mathbb{E}\big[\log P(S=\text{real} \mid x_{\text{real}})\big] + \mathbb{E}\big[\log P(S=\text{fake} \mid G(z, c))\big]
+$$
+$$
+\mathcal{L}_C = \mathbb{E}\big[\log P(C=c \mid x_{\text{real}})\big] + \mathbb{E}\big[\log P(C=c \mid G(z, c))\big]
+$$
+
+   - The discriminator maximizes $\mathcal{L}_S + \mathcal{L}_C$, while the generator maximizes $\mathcal{L}_C - \mathcal{L}_S$. This multi-task structure forces $D$ to learn representationally rich, disentangled semantic features.
+   - *Course Implementations*:
+     - Standard DCGAN Backbone: [`04d_acgan_cifar10.py`](file:///Users/mghifary/Documents/ITB/IF5152/generative-models/04d_acgan_cifar10.py)
+     - Modern ResNet Backbone with CBN & Spectral Norm: [`04e_resnet_acgan_cifar10.py`](file:///Users/mghifary/Documents/ITB/IF5152/generative-models/04e_resnet_acgan_cifar10.py)
+
 ### 8.4 Seminal Applications: Image-to-Image Translation (Pix2Pix)
 
 When the condition $y$ is an entire image (e.g., edge sketch, black-and-white photo, or depth map), cGANs perform **paired Image-to-Image Translation** ([Isola et al., CVPR 2017](https://arxiv.org/abs/1611.07004) - Pix2Pix):
@@ -547,8 +566,10 @@ $$
 ## 11. Summary & Reading Guide
 
 - **Reference Code (Unconditional DCGAN: [`04a_generative_adversarial_network.py`](../04a_generative_adversarial_network.py)):** Unified PyTorch implementation of DCGAN with alternating discriminator and non-saturating generator training loops, supporting MNIST, Fashion-MNIST, and CIFAR-10 (Radford et al. 2016).
-- **Reference Code (Conditional cGAN: [`04b_conditional_dcgan.py`](../04b_conditional_dcgan.py)):** Class-conditional DCGAN supporting CIFAR-10 ($32 \times 32$) and LSUN Scene Modeling ($64 \times 64$, Radford et al. 2016 Figure 1), conditioning both Generator (latent embedding concatenation) and Discriminator (spatial feature channel) on class labels.
+- **Reference Code (Conditional cGAN: [`04b_conditional_dcgan.py`](../04b_conditional_dcgan.py)):** Class-conditional DCGAN supporting CIFAR-10 ($32 \times 32$) and LSUN Scene Modeling ($64 \times 64$, Radford et al. 2016 Figure 1), conditioning both Generator (latent embedding concatenation) and Discriminator (spatial feature channel) on class labels (Mirza & Osindero, 2014).
 - **Reference Code (Modern SOTA cGAN: [`04c_sngan_projection_cifar10.py`](../04c_sngan_projection_cifar10.py)):** High-quality Class-Conditional ResNet GAN with Spectral Normalization, Conditional Batch Normalization (CBN), Projection Discriminator, and Hinge Loss, eliminating DCGAN's quality bottleneck (Miyato et al., ICLR 2018).
+- **Reference Code (Auxiliary Classifier GAN: [`04d_acgan_cifar10.py`](../04d_acgan_cifar10.py)):** Auxiliary Classifier GAN (AC-GAN) on CIFAR-10 with dual-headed discriminator ($D_{\text{adv}}$ and $D_{\text{cls}}$), multi-task loss $\mathcal{L}_S + \mathcal{L}_C$, and EMA generator tracking (Odena et al., ICML 2017).
+- **Reference Code (Modern ResNet AC-GAN: [`04e_resnet_acgan_cifar10.py`](../04e_resnet_acgan_cifar10.py)):** Modern ResNet AC-GAN combining Conditional Batch Normalization (CBN), nearest-neighbor upsampling (eliminating checkerboard artifacts), and spectrally-normalized dual-headed discriminator.
 - **Interactive Web Explorer ([`app_gradio_dcgan_cifar10.py`](../app_gradio_dcgan_cifar10.py)):** Real-time Gradio GUI featuring batch sampling, Slerp/Lerp latent traversal, vector arithmetic, discriminator realness inspector, and an interactive Human vs. AI Turing test.
 - **Next Note ([`05_diffusion_probabilistic_models.md`](./05_diffusion_probabilistic_models.md)):** Explores iterative diffusion models, which retain the sample sharpness of GANs while offering stable, non-adversarial maximum-likelihood training.
 
@@ -568,6 +589,7 @@ $$
 
 3. **Architectures & Stabilization:**
    - Radford, A., Metz, L., & Chintala, S. (2016). "Unsupervised Representation Learning with Deep Convolutional Generative Adversarial Networks". *International Conference on Learning Representations (ICLR 2016)*. [https://arxiv.org/abs/1511.06434](https://arxiv.org/abs/1511.06434)
+   - Odena, A., Olah, C., & Shlens, J. (2017). "Conditional Image Synthesis With Auxiliary Classifier GANs" (AC-GAN). *International Conference on Machine Learning (ICML 2017)*. [https://arxiv.org/abs/1610.09585](https://arxiv.org/abs/1610.09585)
    - Arjovsky, M., & Bottou, L. (2017). "Towards Principled Methods for Training Generative Adversarial Networks". *International Conference on Learning Representations (ICLR 2017)*. [https://arxiv.org/abs/1701.04862](https://arxiv.org/abs/1701.04862)
    - Nowozin, S., Cseke, B., & Tomioka, R. (2016). "f-GAN: Training Generative Neural Samplers using Variational Divergence Minimization". *Advances in Neural Information Processing Systems (NeurIPS 2016)*. [https://arxiv.org/abs/1606.00709](https://arxiv.org/abs/1606.00709)
    - Miyato, T., & Koyama, M. (2018). "cGANs with Projection Discriminator". *International Conference on Learning Representations (ICLR 2018)*. [https://arxiv.org/abs/1802.05637](https://arxiv.org/abs/1802.05637)

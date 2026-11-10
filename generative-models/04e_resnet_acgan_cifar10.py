@@ -265,7 +265,81 @@ class ResNetACGANDiscriminator(nn.Module):
 
 
 # ==============================================================================
-# 3. EXPONENTIAL MOVING AVERAGE (EMA) TRACKER
+# 3. DIFFERENTIABLE AUGMENTATION (DiffAugment - Zhao et al., NeurIPS 2020)
+# ==============================================================================
+def rand_color(x: torch.Tensor) -> torch.Tensor:
+    """Random brightness, contrast, and saturation jitter."""
+    b = torch.empty(x.size(0), 1, 1, 1, dtype=x.dtype, device=x.device).uniform_(-0.2, 0.2)
+    x = x + b
+    x_mean_ch = x.mean(dim=1, keepdim=True)
+    s = torch.empty(x.size(0), 1, 1, 1, dtype=x.dtype, device=x.device).uniform_(0.5, 1.5)
+    x = (x - x_mean_ch) * s + x_mean_ch
+    x_mean_all = x.mean(dim=[1, 2, 3], keepdim=True)
+    c = torch.empty(x.size(0), 1, 1, 1, dtype=x.dtype, device=x.device).uniform_(0.5, 1.5)
+    return (x - x_mean_all) * c + x_mean_all
+
+
+def rand_translation(x: torch.Tensor, ratio: float = 0.125) -> torch.Tensor:
+    """Random translation jitter with zero-padding."""
+    shift_x = int(x.size(2) * ratio + 0.5)
+    shift_y = int(x.size(3) * ratio + 0.5)
+    translation_x = torch.randint(-shift_x, shift_x + 1, size=[x.size(0), 1, 1], device=x.device)
+    translation_y = torch.randint(-shift_y, shift_y + 1, size=[x.size(0), 1, 1], device=x.device)
+    grid_b, grid_x, grid_y = torch.meshgrid(
+        torch.arange(x.size(0), device=x.device),
+        torch.arange(x.size(2), device=x.device),
+        torch.arange(x.size(3), device=x.device),
+        indexing="ij",
+    )
+    grid_x = torch.clamp(grid_x + translation_x + shift_x, 0, x.size(2) + 2 * shift_x - 1)
+    grid_y = torch.clamp(grid_y + translation_y + shift_y, 0, x.size(3) + 2 * shift_y - 1)
+    x_pad = F.pad(x, [shift_y, shift_y, shift_x, shift_x])
+    return x_pad.permute(0, 2, 3, 1).contiguous()[grid_b, grid_x, grid_y].permute(0, 3, 1, 2)
+
+
+def rand_cutout(x: torch.Tensor, ratio: float = 0.5) -> torch.Tensor:
+    """Random rectangular cutout masking."""
+    cutout_size_x = int(x.size(2) * ratio + 0.5)
+    cutout_size_y = int(x.size(3) * ratio + 0.5)
+    offset_x = torch.randint(0, x.size(2) + (1 - cutout_size_x % 2), size=[x.size(0), 1, 1], device=x.device)
+    offset_y = torch.randint(0, x.size(3) + (1 - cutout_size_y % 2), size=[x.size(0), 1, 1], device=x.device)
+    grid_b, grid_x, grid_y = torch.meshgrid(
+        torch.arange(x.size(0), device=x.device),
+        torch.arange(x.size(2), device=x.device),
+        torch.arange(x.size(3), device=x.device),
+        indexing="ij",
+    )
+    mask = ~(
+        (grid_x >= offset_x - cutout_size_x // 2)
+        & (grid_x < offset_x + cutout_size_x // 2)
+        & (grid_y >= offset_y - cutout_size_y // 2)
+        & (grid_y < offset_y + cutout_size_y // 2)
+    )
+    mask = mask.unsqueeze(1).type_as(x)
+    return x * mask
+
+
+def diff_augment(x: torch.Tensor, policy: str = "translation,cutout") -> torch.Tensor:
+    """
+    Differentiable Augmentation (DiffAugment - Zhao et al., NeurIPS 2020).
+    Passes gradients back through data augmentations into Generator G.
+    Prevents Discriminator overfitting on CIFAR-10 without leaking artifacts.
+    """
+    if not policy or policy.lower() == "none":
+        return x
+    for p in policy.split(","):
+        p = p.strip().lower()
+        if p == "color":
+            x = rand_color(x)
+        elif p == "translation":
+            x = rand_translation(x)
+        elif p == "cutout":
+            x = rand_cutout(x)
+    return x.contiguous()
+
+
+# ==============================================================================
+# 4. EXPONENTIAL MOVING AVERAGE (EMA) TRACKER
 # ==============================================================================
 class EMAModel:
     """
@@ -331,7 +405,8 @@ def train_resnet_acgan(
     gen_channels: int = 128,
     disc_channels: int = 128,
     loss_type: str = "bce",
-    lambda_cls: float = 1.0,
+    lambda_cls: float = 0.1,
+    diffaugment: str = "translation,cutout",
     use_ema: bool = True,
     ema_decay: float = 0.999,
     lr_decay: bool = True,
@@ -342,7 +417,7 @@ def train_resnet_acgan(
     resume: bool = False,
 ) -> Tuple[ResNetACGANGenerator, ResNetACGANDiscriminator]:
     """
-    Executes training loop for Modern ResNet AC-GAN on CIFAR-10.
+    Executes training loop for Modern ResNet AC-GAN on CIFAR-10 with DiffAugment.
     """
     device = get_device(device_str)
     print(f"[Device] Using {device} for ResNet AC-GAN CIFAR-10 training.")
@@ -428,6 +503,7 @@ def train_resnet_acgan(
     print(f"\n========================================================")
     print(f"  Modern ResNet AC-GAN on CIFAR-10                       ")
     print(f"  Reference: Odena et al. (2017) + Miyato et al. (2018) ")
+    print(f"  Pathway A: DiffAugment + Annealed lambda_cls          ")
     print(f"========================================================")
     print(f"  Epochs           : {epochs} (starting at {start_epoch})")
     print(f"  Batch Size       : {batch_size}")
@@ -436,6 +512,7 @@ def train_resnet_acgan(
     print(f"  Disc Channels    : {disc_channels}")
     print(f"  Adversarial Loss : {loss_type.upper()}")
     print(f"  Classifier Weight: lambda_cls = {lambda_cls}")
+    print(f"  DiffAugment      : {diffaugment if diffaugment else 'Disabled'}")
     print(f"  EMA Tracking     : {'Active (decay=' + str(ema_decay) + ')' if use_ema else 'Disabled'}")
     print(f"  LR Decay         : {'Linear to 0' if lr_decay else 'Constant (' + str(lr) + ')'}")
     print(f"  Total Batches    : {len(dataloader)}")
@@ -466,16 +543,18 @@ def train_resnet_acgan(
             # ------------------------------------------------------------------
             optimizerD.zero_grad()
 
-            # (a) Real images forward
-            out_real_adv, out_real_cls = netD(real_imgs)
+            # (a) Real images forward (with DiffAugment)
+            real_imgs_d = diff_augment(real_imgs, policy=diffaugment)
+            out_real_adv, out_real_cls = netD(real_imgs_d)
             loss_d_real_cls = cls_criterion(out_real_cls, real_labels)
 
-            # (b) Fake images forward
+            # (b) Fake images forward (with DiffAugment)
             z = torch.randn(b_size, z_dim, device=device)
             fake_labels = torch.randint(0, num_classes, (b_size,), device=device)
             fake_imgs = netG(z, fake_labels)
 
-            out_fake_adv, out_fake_cls = netD(fake_imgs.detach())
+            fake_imgs_d = diff_augment(fake_imgs.detach(), policy=diffaugment)
+            out_fake_adv, out_fake_cls = netD(fake_imgs_d)
             loss_d_fake_cls = cls_criterion(out_fake_cls, fake_labels)
 
             # Adversarial source loss
@@ -499,8 +578,9 @@ def train_resnet_acgan(
             # ------------------------------------------------------------------
             optimizerG.zero_grad()
 
-            # Pass freshly generated images through updated D
-            out_g_adv, out_g_cls = netD(fake_imgs)
+            # Pass freshly generated images through DiffAugment & updated D
+            fake_imgs_g = diff_augment(fake_imgs, policy=diffaugment)
+            out_g_adv, out_g_cls = netD(fake_imgs_g)
 
             # Adversarial source loss for G
             if loss_type == "hinge":
@@ -697,7 +777,8 @@ def main():
     parser.add_argument("--gen-channels", type=int, default=128, help="Generator base channel count (default: 128)")
     parser.add_argument("--disc-channels", type=int, default=128, help="Discriminator base channel count (default: 128)")
     parser.add_argument("--loss-type", type=str, default="bce", choices=["bce", "hinge"], help="Adversarial loss formulation (default: bce)")
-    parser.add_argument("--lambda-cls", type=float, default=1.0, help="Auxiliary classification loss weight (default: 1.0)")
+    parser.add_argument("--lambda-cls", type=float, default=0.1, help="Auxiliary classification loss weight (default: 0.1, preventing shortcutting)")
+    parser.add_argument("--diffaugment", type=str, default="translation,cutout", help="DiffAugment policy (default: translation,cutout; or none)")
     parser.add_argument("--no-ema", action="store_true", help="Disable Exponential Moving Average tracking for Generator")
     parser.add_argument("--ema-decay", type=float, default=0.999, help="EMA decay rate (default: 0.999)")
     parser.add_argument("--no-lr-decay", action="store_true", help="Disable linear learning rate decay")
@@ -730,6 +811,7 @@ def main():
         disc_channels=args.disc_channels,
         loss_type=args.loss_type,
         lambda_cls=args.lambda_cls,
+        diffaugment=args.diffaugment,
         use_ema=not args.no_ema,
         ema_decay=args.ema_decay,
         lr_decay=not args.no_lr_decay,

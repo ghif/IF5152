@@ -33,8 +33,11 @@ graph TD
 | **VAE** | [`03_variational_autoencoder.py`](./03_variational_autoencoder.py) | ELBO: $\mathbb{E}[\log p] - D_{KL}$ | Lower Bound (ELBO) | Fast ($O(1)$ forward pass) | High (Gradient on ELBO) | Blurrier images due to L2/BCE regression |
 | **GAN (Unconditional)** | [`04a_generative_adversarial_network.py`](./04a_generative_adversarial_network.py) | Minimax: $\min_G \max_D V(D, G)$ | None (Implicit) | Fast ($O(1)$ forward pass) | Fragile (Minimax equilibrium) | Vulnerable to mode collapse & vanishing gradients |
 | **cGAN (Conditional DCGAN)** | [`04b_conditional_dcgan.py`](./04b_conditional_dcgan.py) | Conditional Minimax: $V(D, G; y)$ | None (Implicit) | Fast ($O(1)$ forward pass) | Moderate (Label conditioning stabilizes training) | Requires supervised categorical labels $y$ |
+| **AC-GAN (Auxiliary Classifier)** | [`04d_acgan_cifar10.py`](./04d_acgan_cifar10.py) | Multi-Task: $\mathcal{L}_S + \mathcal{L}_C$ (Adversarial + Cross-Entropy) | None (Implicit) | Fast ($O(1)$ forward pass) | High (Disentangled Auxiliary Classification) | Dual-head discriminator tuning |
+| **ResNet AC-GAN (Modern)** | [`04e_resnet_acgan_cifar10.py`](./04e_resnet_acgan_cifar10.py) | ResNet + CBN + Spectral Norm + Dual Heads ($\mathcal{L}_S + \mathcal{L}_C$) | None (Implicit) | Fast ($O(1)$ forward pass) | **Very High (SN bounds Lipschitz; No Checkerboard)** | ResNet parameters (~4.3M) |
 | **SNGAN (ResNet + Projection)** | [`04c_sngan_projection_cifar10.py`](./04c_sngan_projection_cifar10.py) | Hinge Loss + Inner-Product Projection: $\phi(\psi(x)) + \psi(x)^T v_y$ | None (Implicit) | Fast ($O(1)$ forward pass) | **High (Spectral Normalization $\sigma(W) \le 1$)** | ResNet parameters (~4.3M) |
 | **Conditional Diffusion (DDIM / DDPM)** | [`05_denoising_diffusion_model.py`](./05_denoising_diffusion_model.py) | Score / Denoising MSE: $\|\epsilon - \epsilon_\theta(x_t, t, y)\|^2$ | Implicit / VLB | **Fast ($O(S)$ DDIM, 20-50 steps)** | **State-of-the-Art (CFG Guidance $w \ge 1.5$)** | Multi-step reverse sampling |
+| **Rectified Flow (Flow Matching)** | [`06_rectified_flow_cifar10.py`](./06_rectified_flow_cifar10.py) | Straight Line Velocity MSE: $\|v_\theta(x_t, t, y) - (z - x)\|_2^2$ | Implicit / Flow ODE | **Fastest Diffusion ($O(S)$ Euler/Heun, 10-25 steps)** | **State-of-the-Art (Stable MSE, No curved SDE)** | Multi-step reverse ODE integration |
 
 ---
 
@@ -131,6 +134,43 @@ python 04c_sngan_projection_cifar10.py --eval-grid --device mps
 ```
 *Outputs: `samples/sngan_cifar10_samples.png`, `samples/sngan_cifar10_milestones/`, and checkpoints in `checkpoints/` (`sngan_cifar10_generator.pt`, `sngan_cifar10_discriminator.pt`, `sngan_cifar10_checkpoint.pt`).*
 
+### 4d. Auxiliary Classifier GAN (AC-GAN on CIFAR-10)
+Demonstrates multi-task conditional synthesis ([Odena et al., ICML 2017](https://arxiv.org/abs/1610.09585)) where the discriminator takes **RGB image alone** ($3 \times 32 \times 32$) and predicts both source validity (real vs. fake) and class labels simultaneously:
+- **Dual-Headed Discriminator**: Features a source adversarial head and an auxiliary classifier head trained via Cross-Entropy on both real and fake images.
+- **Representation Disentanglement**: Forces the discriminator to learn class-predictive features, boosting training stability.
+- **EMA Tracking**: Exponential Moving Average ($\beta = 0.999$) produces smoothed, high-contrast evaluation samples.
+```bash
+# Train AC-GAN on CIFAR-10 (50 epochs, Apple Silicon M4 Pro GPU)
+python 04d_acgan_cifar10.py --epochs 50 --batch-size 128 --device mps
+
+# Quick verification test (1 epoch on 50 samples)
+python 04d_acgan_cifar10.py --quick-test --device mps
+
+# Generate 10x10 canonical class matrix from saved checkpoint
+python 04d_acgan_cifar10.py --eval-grid --use-ema --device mps
+```
+*Outputs: `samples/acgan_cifar10_samples_ema.png`, `samples/acgan_cifar10_milestones/`, and checkpoints in `checkpoints/` (`acgan_cifar10_generator_ema.pt`, `acgan_cifar10_discriminator.pt`, `acgan_cifar10_checkpoint.pt`).*
+
+### 4e. Modern ResNet Auxiliary Classifier GAN (ResNet AC-GAN on CIFAR-10)
+Combines the canonical dual-headed multi-task objective of AC-GAN with modern architectural breakthroughs to completely overcome DCGAN quality bottlenecks:
+- **Nearest-Neighbor $2\times$ Upsampling + $3\times 3$ Convolutions**: Replaces transposed convolutions in the generator, completely eliminating high-frequency checkerboard artifacts.
+- **Conditional Batch Normalization (CBN)**: Modulates feature channels across all residual stages via learned class embeddings $(\gamma_c, \beta_c)$.
+- **Spectrally-Normalized ResNet Discriminator**: Bounds Lipschitz constant ($\sigma(W) \le 1$) across all downsampling blocks and dual linear heads (`fc_adv`, `fc_cls`), stabilizing multi-task training.
+- **DiffAugment (Differentiable Data Augmentation)**: Applies differentiable translation and cutout (`--diffaugment translation,cutout`) to real and fake images, preventing discriminator memorization on CIFAR-10.
+- **Classifier Loss Annealing ($\lambda_{\text{cls}} = 0.1$)**: Prevents auxiliary cross-entropy from overpowering adversarial realness, forcing the generator to learn realistic anatomy rather than coarse color shortcuts.
+- **EMA Tracking & Linear LR Decay**: Smooths generator parameters ($\beta=0.999$) and decays learning rate cleanly to zero.
+```bash
+# Train Modern ResNet AC-GAN on CIFAR-10 with DiffAugment (50 epochs, Apple Silicon M4 Pro GPU)
+python 04e_resnet_acgan_cifar10.py --epochs 50 --batch-size 128 --lambda-cls 0.1 --diffaugment translation,cutout --device mps
+
+# Quick verification test (1 epoch on 50 samples)
+python 04e_resnet_acgan_cifar10.py --quick-test --device mps
+
+# Generate 10x10 canonical class matrix from saved checkpoint
+python 04e_resnet_acgan_cifar10.py --eval-grid --use-ema --device mps
+```
+*Outputs: `samples/resnet_acgan_cifar10_samples_ema.png`, `samples/resnet_acgan_cifar10_milestones/`, and checkpoints in `checkpoints/` (`resnet_acgan_cifar10_generator_ema.pt`, `resnet_acgan_cifar10_discriminator.pt`, `resnet_acgan_cifar10_checkpoint.pt`).*
+
 ### 5. Class-Conditional Diffusion Model with DDIM Sampler (CIFAR-10)
 Demonstrates state-of-the-art score-based generative modeling with **Classifier-Free Guidance (CFG)** and **Denoising Diffusion Implicit Model (DDIM)** on **CIFAR-10** ($3 \times 32 \times 32$, 10 classes):
 - **ResNet U-Net**: GroupNorm, SiLU, and multi-head spatial self-attention at $16 \times 16$ and $8 \times 8$.
@@ -148,7 +188,48 @@ python 05_denoising_diffusion_model.py --sample-only --sampler ddim --ddim-steps
 ```
 *Outputs: `samples/cddpm_cifar10_samples.png`, `samples/cddpm_cifar10_milestones/`, and checkpoints in `checkpoints/` (`cddpm_cifar10_model.pt`, `cddpm_cifar10_checkpoint.pt`).*
 
-### 6. Interactive Gradio GUIs
+### 6. Class-Conditional Rectified Flow (CIFAR-10)
+Demonstrates continuous-time **Rectified Flow & Flow Matching** ([Liu et al. ICLR 2023](https://arxiv.org/abs/2209.03003); [Lipman et al. ICLR 2023](https://arxiv.org/abs/2210.02747); **Lecture Slides 180–181 & 204–212**), as adopted by state-of-the-art foundation models (Stable Diffusion 3, Flux, Movie Gen):
+- **Straight Trajectory**: Replaces curved diffusion schedules with a linear path connecting data $x$ and Gaussian noise $z$: $x_t = (1 - t)x + tz$.
+- **Constant Target Velocity**: Differentiating yields $v_{\text{gt}} = z - x$, learned directly by a continuous-time U-Net: $\mathcal{L} = \|v_\theta(x_t, t, y) - (z - x)\|_2^2$.
+- **Velocity-Space Classifier-Free Guidance**: Extrapolates along the class-conditioned direction ($v_{\text{cfg}} = v_\emptyset + s(v_y - v_\emptyset)$).
+- **Fast Numerical ODE Solvers**: Integrates reverse trajectories in just $10-25$ steps using **1st-Order Euler** or **2nd-Order Heun (Predictor-Corrector)**.
+```bash
+# Train Rectified Flow on CIFAR-10 (50 epochs, Apple Silicon M4 Pro GPU)
+python 06_rectified_flow_cifar10.py --epochs 50 --batch-size 128 --channels 64 --solver heun --device mps
+
+# Quick verification test (1 epoch on subset)
+python 06_rectified_flow_cifar10.py --quick-test --device mps
+
+# Generate 10x10 evaluation grid from saved checkpoint using 2nd-order Heun solver (15 steps)
+python 06_rectified_flow_cifar10.py --eval-grid --use-ema --solver heun --steps 15 --cfg-scale 2.0 --device mps
+```
+*Outputs: `samples/rectified_flow_cifar10_samples.png`, `samples/rectified_flow_cifar10_milestones/`, and checkpoints in `checkpoints/` (`rectified_flow_cifar10_model_ema.pt`, `rectified_flow_cifar10_checkpoint.pt`).*
+
+#### 6.1 Training on Google Colab CLI (GPU G4 / T4 / L4)
+For faster high-throughput training using NVIDIA Tensor Cores with FP16 Automatic Mixed Precision (AMP), you can run `06_rectified_flow_cifar10.py` directly on Google Colab using the official [`googlecolab/google-colab-cli`](https://github.com/googlecolab/google-colab-cli):
+
+```bash
+# 1. Provision a remote Colab session with GPU G4 (or T4)
+./run_colab_cli.sh start
+
+# 2. Upload codebase to Colab VM
+./run_colab_cli.sh upload
+
+# 3. Connect to interactive TTY console
+./run_colab_cli.sh console
+
+# Inside Colab console:
+python3 06_rectified_flow_cifar10.py --epochs 80 --batch-size 128 --solver heun --steps 25
+
+# 4. Download checkpoints and generated samples back to local machine
+./run_colab_cli.sh download
+
+# 5. Stop the session to preserve Colab compute units
+./run_colab_cli.sh stop
+```
+
+### 7. Interactive Gradio GUIs
 1. **AE vs. VAE Latent Generation Demo**: Contrasts **Untrained AE**, **Trained AE**, and **Trained VAE** with continuous latent sliders ($d=10$):
    ```bash
    python app_gradio_ae_vs_vae.py
