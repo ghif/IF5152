@@ -100,20 +100,20 @@ cmd_download() {
     log_info "Archiving remote checkpoints and samples on remote VM..."
     cat << 'EOF' > /tmp/remote_pack.py
 import os, tarfile
-with tarfile.open("rf_cifar10_artifacts.tar.gz", "w:gz") as tar:
-    if os.path.exists("checkpoints"):
-        tar.add("checkpoints", arcname="checkpoints")
-    if os.path.exists("samples"):
-        tar.add("samples", arcname="samples")
+with tarfile.open("/content/rf_cifar10_artifacts.tar.gz", "w:gz") as tar:
+    if os.path.exists("/content/checkpoints"):
+        tar.add("/content/checkpoints", arcname="checkpoints")
+    if os.path.exists("/content/samples"):
+        tar.add("/content/samples", arcname="samples")
 print("Archive created successfully.")
 EOF
-    "$COLAB_BIN" upload -s "${SESSION_NAME}" /tmp/remote_pack.py remote_pack.py
+    "$COLAB_BIN" upload -s "${SESSION_NAME}" /tmp/remote_pack.py /content/remote_pack.py
     "$COLAB_BIN" exec -s "${SESSION_NAME}" -f /tmp/remote_pack.py || true
     rm -f /tmp/remote_pack.py
 
     log_info "Downloading 'rf_cifar10_artifacts.tar.gz' to local machine..."
     mkdir -p /tmp/colab_dl
-    if "$COLAB_BIN" download -s "${SESSION_NAME}" rf_cifar10_artifacts.tar.gz /tmp/colab_dl/rf_cifar10_artifacts.tar.gz; then
+    if "$COLAB_BIN" download -s "${SESSION_NAME}" /content/rf_cifar10_artifacts.tar.gz /tmp/colab_dl/rf_cifar10_artifacts.tar.gz; then
         log_info "Extracting downloaded artifacts into ${SCRIPT_DIR}..."
         tar -xzf /tmp/colab_dl/rf_cifar10_artifacts.tar.gz -C "${SCRIPT_DIR}"
         rm -rf /tmp/colab_dl
@@ -122,10 +122,10 @@ EOF
         ls -la "${SAMPLES_DIR}"/rectified_flow* 2>/dev/null || true
     else
         log_warn "Remote archive download failed or not found. Trying direct file download..."
-        "$COLAB_BIN" download -s "${SESSION_NAME}" checkpoints/rectified_flow_cifar10_checkpoint.pt "${CHECKPOINT_DIR}/rectified_flow_cifar10_checkpoint.pt" || true
-        "$COLAB_BIN" download -s "${SESSION_NAME}" checkpoints/rectified_flow_cifar10_model.pt "${CHECKPOINT_DIR}/rectified_flow_cifar10_model.pt" || true
-        "$COLAB_BIN" download -s "${SESSION_NAME}" checkpoints/rectified_flow_cifar10_model_ema.pt "${CHECKPOINT_DIR}/rectified_flow_cifar10_model_ema.pt" || true
-        "$COLAB_BIN" download -s "${SESSION_NAME}" samples/rectified_flow_cifar10_samples.png "${SAMPLES_DIR}/rectified_flow_cifar10_samples.png" || true
+        "$COLAB_BIN" download -s "${SESSION_NAME}" /content/checkpoints/rectified_flow_cifar10_checkpoint.pt "${CHECKPOINT_DIR}/rectified_flow_cifar10_checkpoint.pt" || true
+        "$COLAB_BIN" download -s "${SESSION_NAME}" /content/checkpoints/rectified_flow_cifar10_model.pt "${CHECKPOINT_DIR}/rectified_flow_cifar10_model.pt" || true
+        "$COLAB_BIN" download -s "${SESSION_NAME}" /content/checkpoints/rectified_flow_cifar10_model_ema.pt "${CHECKPOINT_DIR}/rectified_flow_cifar10_model_ema.pt" || true
+        "$COLAB_BIN" download -s "${SESSION_NAME}" /content/samples/rectified_flow_cifar10_samples.png "${SAMPLES_DIR}/rectified_flow_cifar10_samples.png" || true
     fi
 }
 
