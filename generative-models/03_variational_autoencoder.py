@@ -3,7 +3,7 @@
 =============================
 Variational Autoencoder (VAE) Implementation and Latent Manifold Traversal.
 
-Key Concepts (Lecture 13, Slides 71-112):
+Key Theoretical Concepts:
 - Latent variable model with Gaussian prior p(z) = N(0, I).
 - Intractable posterior p(z|x) approximated by encoder q_phi(z|x).
 - Evidence Lower Bound (ELBO):
@@ -101,7 +101,7 @@ def elbo_loss(x: torch.Tensor, x_recon: torch.Tensor, mu: torch.Tensor, log_var:
 @torch.no_grad()
 def plot_latent_manifold(model: VAE, device: torch.device, filename: str, n: int = 20):
     """
-    Generates a 2D grid manifold by sweeping across latent space (Lecture Slide 112).
+    Generates a 2D grid manifold by sweeping across latent space.
     Only valid if latent_dim == 2.
     """
     model.eval()

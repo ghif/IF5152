@@ -1,4 +1,4 @@
-# IF5152 Lecture Notes: Generative Adversarial Networks (GANs)
+# Generative Adversarial Networks: Adversarial Minimax Games, SNGAN & AC-GAN
 
 ---
 
@@ -127,7 +127,7 @@ $$
 
 ## 2. Overview & Taxonomy
 
-In Lecture 13, Generative Adversarial Networks ([Goodfellow et al., NeurIPS 2014](https://arxiv.org/abs/1406.2661); [Goodfellow, NIPS 2016 Tutorial](https://arxiv.org/abs/1701.00160)) are classified under **Implicit Density & Direct Sampling**:
+In the modern taxonomy of generative modeling ([Goodfellow et al., NeurIPS 2014](https://arxiv.org/abs/1406.2661); [Goodfellow, NIPS 2016 Tutorial](https://arxiv.org/abs/1701.00160)), Generative Adversarial Networks are classified under **Implicit Density & Direct Sampling**:
 
 ```mermaid
 graph TD

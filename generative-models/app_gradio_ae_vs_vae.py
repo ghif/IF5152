@@ -537,11 +537,11 @@ def build_gradio_app(device: torch.device):
 
                         analysis_display = math_markdown()
 
-        # Footer with lecture note references
+        # Footer with technical guide references
         math_markdown(
             """
             ---
-            📖 **Lecture References**: [Note 02: Autoencoders vs. VAEs](docs/02_autoencoders_vs_vaes.md) | [Note 03: Latent Variable Models & ELBO Derivation](docs/03_variational_inference_elbo.md)
+            📖 **Technical Guides**: [Guide 02: Autoencoders vs. VAEs](docs/02_autoencoders_vs_vaes.md) | [Guide 03: Latent Variable Models & ELBO Derivation](docs/03_variational_inference_elbo.md)
             """
         )
 

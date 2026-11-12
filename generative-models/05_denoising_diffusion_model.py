@@ -4,7 +4,7 @@
 Class-Conditional Denoising Diffusion Probabilistic Model (DDPM) & 
 Denoising Diffusion Implicit Model (DDIM) on CIFAR-10 ($3 \\times 32 \\times 32$).
 
-Key Concepts & Formulations (Lecture 13 & Canonical Literature):
+Key Concepts & Formulations (Ho et al. 2020; Song et al. 2021):
 1. Forward Process (Noising):
    q(x_t | x_0) = sqrt(alpha_bar_t) * x_0 + sqrt(1 - alpha_bar_t) * eps, where eps ~ N(0, I)
 2. Score Matching / Noise Prediction:

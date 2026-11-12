@@ -1,68 +1,92 @@
-# IF5152 Lecture Notes: Denoising Diffusion Probabilistic Models (DDPM)
+# Denoising Diffusion Probabilistic Models: DDPM & Accelerated DDIM
 
 ---
 
-## 1. Overview & Taxonomy
+## 1. Core Concept & Problem Formulation
 
-In the modern generative landscape (Lecture 13, slides 46–47 & 116), **Diffusion Models** represent the state of the art in generative quality, classified under **Implicit Density & Iterative Sampling**:
+### 1.1 The Diffusion Paradigm
+
+In the landscape of deep generative modeling, **Diffusion Models** ([Sohl-Dickstein et al., ICML 2015](https://arxiv.org/abs/1503.03585); [Ho, Jain, & Abbeel, NeurIPS 2020](https://arxiv.org/abs/2006.11239)) represent state-of-the-art visual generation quality, classified under **Implicit Density & Iterative Sampling**:
 
 ```mermaid
 graph TD
     GM["Generative Models"] --> ED["Explicit Density"]
     GM --> ID["Implicit Density"]
     ID --> Direct["Direct: GANs (Single Step)"]
-    ID --> Iterative["Indirect / Iterative: Diffusion Models (Multi-Step)"]
+    ID --> Iterative["Indirect / Iterative: Diffusion Models (Multi-Step Reverse Process)"]
 ```
 
-Unlike GANs (which generate samples in a single forward pass through an adversarial game), Diffusion Models formulate generation as a **gradual reverse stochastic process**, iteratively cleaning noisy inputs over hundreds of discrete steps ([Sohl-Dickstein et al., ICML 2015](https://arxiv.org/abs/1503.03585); [Ho, Jain, & Abbeel, NeurIPS 2020](https://arxiv.org/abs/2006.11239)).
+Unlike GANs (which map noise to data in a single adversarial step), diffusion models formulate generation as a **gradual reverse stochastic process**, iteratively denoising a chaotic Gaussian latent variable over discrete timesteps.
+
+```mermaid
+flowchart LR
+    X0["Clean Image x_0"] -->|"Forward Process q(x_t | x_{t-1})<br/>(Noise Injection)"| XT["Pure Noise x_T ~ N(0, I)"]
+    XT -->|"Reverse Process p_theta(x_{t-1} | x_t)<br/>(Learned Denoising)"| X0_rec["Generated Image x_0"]
+```
+
+This formulation offers significant fundamental advantages:
+1. **Stable Likelihood-Based Objective:** Replaces the unstable two-player minimax saddle-point game of GANs with a stable mean-squared error (MSE) regression loss.
+2. **Full Mode Coverage:** Because training optimizes a variational lower bound over the entire data distribution, diffusion models are inherently resistant to mode collapse.
+3. **High-Resolution Fidelity:** Yields crisp high-frequency textures without delicate discriminator tuning.
 
 ---
 
-## 2. The Forward Process (Noising)
+## 2. Mathematical Foundation & Objective Derivation
 
-The forward process $q$ is a fixed, non-learnable Markov chain that gradually destroys information by adding Gaussian noise over $T$ timesteps according to a predefined variance schedule $\beta_1, \beta_2, \dots, \beta_T$:
+### 2.1 The Forward Process (Noising Markov Chain)
+
+The forward process $q$ is a fixed, non-learnable Markov chain that gradually destroys structure by adding Gaussian noise over $T$ discrete timesteps according to a predefined variance schedule $\beta_1, \beta_2, \dots, \beta_T$:
 
 $$
 q(x_t \mid x_{t-1}) = \mathcal{N}\left(x_t; \sqrt{1 - \beta_t} x_{t-1}, \, \beta_t \mathbf{I}\right)
 $$
 
-```mermaid
-flowchart LR
-    X0["Clean Image x_0"] -->|q| X1["x_1"]
-    X1 -->|q| XT1["..."]
-    XT1 -->|q| XT["Pure Noise x_T ~ N(0, I)"]
-```
+Jointly over the trajectory:
 
-### The Closed-Form Forward Shortcut
-A key mathematical property of Gaussian Markov chains is that we do not need to simulate $t$ intermediate steps to generate $x_t$.
+$$
+q(x_{1:T} \mid x_0) = \prod_{t=1}^T q(x_t \mid x_{t-1})
+$$
+
+As $T \to \infty$ with $\sum \beta_t \to \infty$, the distribution at the final step converges to an isotropic Gaussian: $x_T \sim \mathcal{N}(0, \mathbf{I})$.
+
+---
+
+### 2.2 The Closed-Form Forward Shortcut
+
+A key mathematical property of Gaussian Markov chains is that we do not need to simulate $t$ intermediate steps to sample $x_t$.
 Let $\alpha_t = 1 - \beta_t$ and $\bar{\alpha}_t = \prod_{s=1}^t \alpha_s$:
+
+$$
+x_t = \sqrt{\alpha_t} x_{t-1} + \sqrt{1 - \alpha_t} \epsilon_{t-1}
+$$
+
+By recursive substitution of independent Gaussian variables:
 
 $$
 x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon, \quad \text{where } \epsilon \sim \mathcal{N}(0, \mathbf{I})
 $$
 
-This closed form allows us to sample an arbitrary timestep $t \sim \mathcal{U}(1, T)$ in $O(1)$ constant time during training!
+This closed form allows us to sample an arbitrary timestep $t \sim \mathcal{U}(1, T)$ in **$O(1)$ constant time** during training without unrolling intermediate steps.
 
 ---
 
-## 3. The Reverse Process (Denoising)
+### 2.3 The Reverse Process (Learned Denoising)
 
-If we could compute the true reverse conditional distribution $q(x_{t-1} \mid x_t)$, we could start with pure noise $x_T \sim \mathcal{N}(0, \mathbf{I})$ and reverse the chain step by step.
-However, $q(x_{t-1} \mid x_t)$ depends on the entire data distribution $q(x_0)$, which is unknown.
+If we could compute the true reverse conditional distribution $q(x_{t-1} \mid x_t)$, we could invert the chain starting from pure noise $x_T \sim \mathcal{N}(0, \mathbf{I})$. However, $q(x_{t-1} \mid x_t)$ depends on the unknown data distribution $q(x_0)$.
 
-Instead, we train a parameterized neural network $p_\theta(x_{t-1} \mid x_t)$ (typically a U-Net with timestep embeddings) to approximate this reverse distribution:
+Instead, we train a parameterized neural network $p_\theta(x_{t-1} \mid x_t)$ (typically a U-Net with timestep embeddings) to approximate the reverse transitions:
 
 $$
 p_\theta(x_{t-1} \mid x_t) = \mathcal{N}\left(x_{t-1}; \mu_\theta(x_t, t), \, \Sigma_\theta(x_t, t)\right)
 $$
 
-[Ho et al. (2020)](https://arxiv.org/abs/2006.11239) demonstrated that fixing $\Sigma_\theta(x_t, t) = \sigma_t^2 \mathbf{I}$ (where $\sigma_t^2 = \beta_t$ or $\tilde{\beta}_t = \frac{1 - \bar{\alpha}_{t-1}}{1 - \bar{\alpha}_t} \beta_t$) works remarkably well, leaving only the mean $\mu_\theta$ to be learned.
+[Ho et al. (2020)](https://arxiv.org/abs/2006.11239) proved that setting $\Sigma_\theta(x_t, t) = \sigma_t^2 \mathbf{I}$ (where $\sigma_t^2 = \beta_t$ or $\tilde{\beta}_t = \frac{1 - \bar{\alpha}_{t-1}}{1 - \bar{\alpha}_t} \beta_t$) works remarkably well in practice, leaving only the mean $\mu_\theta$ to be learned.
 
 ---
 
-## 4. The Training Objective ($L_{\text{simple}}$)
+### 2.4 Derivation of the Simplified Training Objective ($L_{\text{simple}}$)
 
-By expanding the Variational Lower Bound (VLB) on the negative log-likelihood $\mathbb{E}[-\log p_\theta(x_0)]$, the objective reduces to matching the reverse step posterior with a closed form:
+Conditioned on the original clean image $x_0$, the true posterior of the reverse step is tractable and Gaussian:
 
 $$
 q(x_{t-1} \mid x_t, x_0) = \mathcal{N}\left(x_{t-1}; \tilde{\mu}_t(x_t, x_0), \tilde{\beta}_t \mathbf{I}\right)
@@ -74,90 +98,181 @@ $$
 \tilde{\mu}_t(x_t, x_0) = \frac{\sqrt{\bar{\alpha}_{t-1}}\beta_t}{1 - \bar{\alpha}_t} x_0 + \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} x_t
 $$
 
-Substituting $x_0 = \frac{x_t - \sqrt{1 - \bar{\alpha}_t}\epsilon}{\sqrt{\bar{\alpha}_t}}$ reveals that predicting $\tilde{\mu}_t$ is equivalent to **predicting the Gaussian noise vector $\epsilon$** that was injected at step $t$:
+Substituting the forward shortcut $x_0 = \frac{x_t - \sqrt{1 - \bar{\alpha}_t}\epsilon}{\sqrt{\bar{\alpha}_t}}$ reveals that predicting $\tilde{\mu}_t$ is mathematically equivalent to **predicting the injected Gaussian noise vector $\epsilon$**:
 
 $$
 \mu_\theta(x_t, t) = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{\beta_t}{\sqrt{1 - \bar{\alpha}_t}} \epsilon_\theta(x_t, t) \right)
 $$
 
-### Simplified Loss Function
-Ho et al. showed that dropping the complicated weighting factors yields superior perceptual generation quality:
+By expanding the Variational Lower Bound (VLB) and dropping the complicated weighting terms, Ho et al. arrived at the **simplified MSE loss**:
 
 $$
 \mathcal{L}_{\text{simple}}(\theta) = \mathbb{E}_{t \sim [1, T], \, x_0, \, \epsilon \sim \mathcal{N}(0, \mathbf{I})} \left[ \| \epsilon - \epsilon_\theta(x_t, t) \|_2^2 \right]
 $$
 
-### Training Algorithm in 4 Steps:
-1. Sample clean data $x_0 \sim q(x_0)$ from the training batch.
+#### 4-Step Training Algorithm:
+1. Sample clean data $x_0 \sim p_{\text{data}}$.
 2. Sample timestep $t \sim \text{Uniform}(1, \dots, T)$.
-3. Sample noise $\epsilon \sim \mathcal{N}(0, \mathbf{I})$ and compute noisy image $x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon$.
-4. Compute gradient $\nabla_\theta \| \epsilon - \epsilon_\theta(x_t, t) \|^2$ and step optimizer.
+3. Sample Gaussian noise $\epsilon \sim \mathcal{N}(0, \mathbf{I})$ and compute noisy image $x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon$.
+4. Compute gradient $\nabla_\theta \| \epsilon - \epsilon_\theta(x_t, t) \|_2^2$ and step optimizer.
 
 ---
 
-## 5. Reverse Sampling Dynamics: DDPM & Accelerated DDIM
+## 3. Architecture & Code Walkthrough (`05_denoising_diffusion_model.py`)
 
-### 5.1 Stochastic Ancestral Sampling (DDPM, Ho et al. 2020)
+The implementation in [`05_denoising_diffusion_model.py`](file:///Users/mghifary/Documents/ITB/IF5152/generative-models/05_denoising_diffusion_model.py) features a complete class-conditional ResNet U-Net tailored for CIFAR-10 ($3 \times 32 \times 32$).
 
-To synthesize a new image from scratch using the standard Markovian formulation:
-1. Sample $x_T \sim \mathcal{N}(0, \mathbf{I})$.
+```mermaid
+flowchart TD
+    subgraph Diffusion_UNet ["Conditional ResNet U-Net Pipeline"]
+        InputNoise["Noisy Image x_t (B, 3, 32, 32)"] --> InitConv["Conv2d (3 -> 64)"]
+        TimeStep["Timestep t"] --> TimeEmb["SinusoidalPositionEmbeddings(dim=128) + MLP"]
+        ClassY["Class Label y"] --> ClassEmb["Embedding(11, dim=128)"]
+        TimeEmb & ClassEmb --> CondVec["Conditioning Vector: e_cond = e_time + e_class"]
+        
+        InitConv --> Down1["ResBlock Down (64)"]
+        Down1 --> Down2["ResBlock Down (128) + AttentionBlock (16x16)"]
+        Down2 --> Down3["ResBlock Down (256) + AttentionBlock (8x8)"]
+        
+        Down3 --> Mid["MidBlock: ResBlock + AttentionBlock + ResBlock (256)"]
+        
+        Mid --> Up1["ResBlock Up (256 -> 128) + AttentionBlock (16x16)"]
+        Up1 --> Up2["ResBlock Up (128 -> 64)"]
+        Up2 --> FinalConv["GroupNorm + SiLU + Conv2d (64 -> 3)"]
+        FinalConv --> PredNoise["Predicted Injected Noise epsilon_theta (B, 3, 32, 32)"]
+        
+        CondVec -.->|"Project & Add into hidden states"| Down1 & Down2 & Down3 & Mid & Up1 & Up2
+    end
+```
+
+---
+
+### 3.1 Sinusoidal Position Embeddings: `SinusoidalPositionEmbeddings`
+
+Following [Vaswani et al. (2017)](https://arxiv.org/abs/1706.03762) and [Ho et al. (2020)](https://arxiv.org/abs/2006.11239), the discrete scalar timestep $t \in [1, T]$ is transformed into a continuous embedding vector using sinusoidal frequencies:
+
+From [`05_denoising_diffusion_model.py`](file:///Users/mghifary/Documents/ITB/IF5152/generative-models/05_denoising_diffusion_model.py#L52-L69):
+
+```python
+class SinusoidalPositionEmbeddings(nn.Module):
+    def __init__(self, dim: int):
+        super().__init__()
+        self.dim = dim
+
+    def forward(self, time: torch.Tensor) -> torch.Tensor:
+        device = time.device
+        half_dim = self.dim // 2
+        embeddings = math.log(10000) / (half_dim - 1)
+        embeddings = torch.exp(torch.arange(half_dim, device=device) * -embeddings)
+        embeddings = time[:, None].float() * embeddings[None, :]
+        return torch.cat((embeddings.sin(), embeddings.cos()), dim=-1)
+```
+
+---
+
+### 3.2 Multi-Head Self-Attention: `AttentionBlock`
+
+To coordinate global spatial features across distant pixels (e.g., ensuring both wings of an airplane match), spatial multi-head self-attention is applied at lower spatial resolutions ($16 \times 16$ and $8 \times 8$).
+
+From [`05_denoising_diffusion_model.py`](file:///Users/mghifary/Documents/ITB/IF5152/generative-models/05_denoising_diffusion_model.py#L71-L97):
+
+```python
+class AttentionBlock(nn.Module):
+    def __init__(self, channels: int, num_heads: int = 4):
+        super().__init__()
+        self.num_heads = num_heads
+        self.head_dim = channels // num_heads
+        self.norm = nn.GroupNorm(min(8, channels), channels)
+        self.qkv = nn.Conv2d(channels, channels * 3, kernel_size=1, bias=False)
+        self.proj = nn.Conv2d(channels, channels, kernel_size=1, bias=False)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        b, c, h, w = x.shape
+        h_norm = self.norm(x)
+        qkv = self.qkv(h_norm).view(b, 3, self.num_heads, self.head_dim, h * w)
+        q, k, v = qkv[:, 0].transpose(-2, -1), qkv[:, 1].transpose(-2, -1), qkv[:, 2].transpose(-2, -1)
+        out = torch.nn.functional.scaled_dot_product_attention(q, k, v)
+        out = out.transpose(-2, -1).contiguous().view(b, c, h, w)
+        return x + self.proj(out)
+```
+
+---
+
+### 3.3 Conditioning Vector Injection: `ResBlock`
+
+Timestep and class conditioning vectors are fused additively:
+
+$$
+e_{\text{cond}} = e_{\text{time}} + e_{\text{class}}
+$$
+
+Within each `ResBlock`, $e_{\text{cond}}$ is passed through a linear projection and added directly into the normalized feature map before the second convolution.
+
+---
+
+## 4. Reverse Sampling Dynamics & Accelerated Algorithms
+
+### 4.1 Stochastic Ancestral Sampling (DDPM, Ho et al. 2020)
+
+To synthesize images using the standard Markovian reverse process:
+1. Initialize $x_T \sim \mathcal{N}(0, \mathbf{I})$.
 2. For $t = T, T-1, \dots, 1$:
    - Sample $z \sim \mathcal{N}(0, \mathbf{I})$ if $t > 1$, else $z = \mathbf{0}$.
-   - Compute:
+   - Compute reverse step:
 
 $$
-x_{t-1} = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t}} \epsilon_\theta(x_t, t) \right) + \sigma_t z
+x_{t-1} = \frac{1}{\sqrt{\alpha_t}} \left( x_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar{\alpha}_t}} \epsilon_\theta(x_t, t, y) \right) + \sigma_t z
 $$
 
-     where $\sigma_t^2 = \beta_t$ or $\tilde{\beta}_t = \frac{1 - \bar{\alpha}_{t-1}}{1 - \bar{\alpha}_t} \beta_t$.
+     where $\sigma_t^2 = \tilde{\beta}_t = \frac{1 - \bar{\alpha}_{t-1}}{1 - \bar{\alpha}_t} \beta_t$.
 3. Return clean sample $x_0$.
 
-While theoretically sound, DDPM requires $T = 1000$ sequential network evaluations, making generation prohibitively slow ($O(T)$ latency).
+**Limitation:** DDPM requires simulating all $T = 1000$ sequential evaluations, taking $30\text{--}60$ seconds per batch.
 
 ---
 
-### 5.2 Accelerated Non-Markovian Sampling (DDIM, Song et al. 2021)
+### 4.2 Accelerated Non-Markovian Sampling (DDIM, Song et al. 2021)
 
-[Song, Meng, & Ermon (ICLR 2021)](https://arxiv.org/abs/2010.02502) proved that the forward marginal distributions $q(x_t \mid x_0)$ can be matched using a family of **non-Markovian forward inference processes**:
+[Song, Meng, & Ermon (ICLR 2021)](https://arxiv.org/abs/2010.02502) proved that the forward marginals $q(x_t \mid x_0)$ can be matched using **non-Markovian forward inference processes**:
 
 $$
 q_\sigma(x_{t-1} \mid x_t, x_0) = \mathcal{N}\left( \sqrt{\bar{\alpha}_{t-1}} x_0 + \sqrt{1 - \bar{\alpha}_{t-1} - \sigma_t^2} \frac{x_t - \sqrt{\bar{\alpha}_t}x_0}{\sqrt{1 - \bar{\alpha}_t}}, \, \sigma_t^2 \mathbf{I} \right)
 $$
 
-where the stochasticity is governed by:
+where stochasticity is governed by:
 
 $$
 \sigma_t = \eta \sqrt{\frac{1 - \bar{\alpha}_{t-1}}{1 - \bar{\alpha}_t}} \sqrt{1 - \frac{\bar{\alpha}_t}{\bar{\alpha}_{t-1}}}
 $$
 
 #### The Deterministic ODE Regime ($\eta = 0$):
-When $\eta = 0$, $\sigma_t = 0$. The stochastic reverse process collapses into a **completely deterministic Ordinary Differential Equation (ODE)** trajectory:
+Setting $\eta = 0$ sets $\sigma_t = 0$, transforming the reverse chain into a **completely deterministic Ordinary Differential Equation (ODE)**:
 
 1. **Predict Clean Image ($\hat{x}_0$):**
 
 $$
-\hat{x}_0 = \frac{x_t - \sqrt{1 - \bar{\alpha}_t} \epsilon_\theta(x_t, t)}{\sqrt{\bar{\alpha}_t}}
+\hat{x}_0 = \frac{x_t - \sqrt{1 - \bar{\alpha}_t} \epsilon_\theta(x_t, t, y)}{\sqrt{\bar{\alpha}_t}}
 $$
 
 2. **Deterministic Step to $x_{t-1}$:**
 
 $$
-x_{t-1} = \sqrt{\bar{\alpha}_{t-1}} \hat{x}_0 + \sqrt{1 - \bar{\alpha}_{t-1}} \epsilon_\theta(x_t, t)
+x_{t-1} = \sqrt{\bar{\alpha}_{t-1}} \hat{x}_0 + \sqrt{1 - \bar{\alpha}_{t-1}} \epsilon_\theta(x_t, t, y)
 $$
 
-#### Key Advantages of DDIM:
-- **Sub-sequence Sampling ($S \ll T$):** Instead of simulating all $T = 1000$ timesteps, DDIM samples along an evenly spaced trajectory $\tau = [\tau_1, \tau_2, \dots, \tau_S]$ (e.g., $S = 25$ or $50$ steps).
-- **$20\times\text{--}50\times$ Speedup:** Full batches generate in **1–2 seconds** instead of minutes.
-- **Consistent Latent Trajectories:** Because $\eta = 0$ is deterministic, the initial noise vector $x_T$ acts as an exact invertible latent code, enabling latent interpolation and semantic editing just like GANs.
+#### Advantages of DDIM:
+- **Sub-sequence Trajectories ($S \ll T$):** Evaluates only an evenly spaced sub-sequence $\tau = [\tau_1, \tau_2, \dots, \tau_S]$ (e.g. $S = 25$ or $50$ steps).
+- **$20\times\text{--}50\times$ Speedup:** Generation completes in **1–2 seconds** instead of minutes.
+- **Invertible Latents:** Because the ODE is deterministic, $x_T$ acts as a unique latent code enabling exact latent interpolation and editing.
 
 ---
 
-### 5.3 Classifier-Free Guidance (CFG, Ho & Salimans 2022)
+### 4.3 Classifier-Free Guidance (CFG, Ho & Salimans 2022)
 
-In class-conditional synthesis, conditioning simply on class labels often produces muted or ambiguous samples. [Ho & Salimans (2022)](https://arxiv.org/abs/2207.12598) introduced **Classifier-Free Guidance (CFG)**, avoiding the need for an external noisy classifier network.
+In class-conditional synthesis, simply feeding class labels often yields muted, ambiguous generations. [Ho & Salimans (2022)](https://arxiv.org/abs/2207.12598) introduced **Classifier-Free Guidance (CFG)**:
 
-#### 1. Training with Label Dropout:
-During training, the class label $y \in \{0, \dots, K-1\}$ is randomly dropped to an unconditional null token $\emptyset$ with probability $p_{\text{uncond}} \approx 0.15$:
+1. **Training with Label Dropout:**
+   With probability $p_{\text{uncond}} \approx 0.15$, the class label $y \in \{0, \dots, K-1\}$ is dropped to an unconditional null token $\emptyset$:
 
 $$
 y_{\text{train}} = \begin{cases}
@@ -166,178 +281,91 @@ y & \text{with probability } 1 - p_{\text{uncond}}
 \end{cases}
 $$
 
-#### 2. Inference Extrapolation:
-At sampling time, the network computes both the conditional estimate $\epsilon_\theta(x_t, t, y)$ and the unconditional estimate $\epsilon_\theta(x_t, t, \emptyset)$. The guided noise prediction extrapolates away from the unconditional prior:
+2. **Inference Extrapolation:**
+   At sampling time, the network evaluates both conditional $\epsilon_\theta(x_t, t, y)$ and unconditional $\epsilon_\theta(x_t, t, \emptyset)$ estimates in a single batched pass. The guided noise prediction extrapolates away from the unconditional prior:
 
 $$
 \hat{\epsilon}_\theta(x_t, t, y) = \epsilon_\theta(x_t, t, \emptyset) + w \cdot \left( \epsilon_\theta(x_t, t, y) - \epsilon_\theta(x_t, t, \emptyset) \right)
 $$
 
-where $w \ge 1.0$ is the **guidance scale**:
-- $w = 1.0$: Standard conditional diffusion.
-- $w \in [1.5, 3.0]$: Amplifies class-discriminative features, sharpens textures, and increases perceptual contrast at the cost of slight diversity reduction.
+where $w \ge 1.0$ is the guidance scale (e.g., $w = 2.0\text{--}3.0$), strongly amplifying class-discriminative visual features and contrast.
 
 ---
 
-### 5.4 Conditional ResNet U-Net Architecture
+### 4.4 Exponential Moving Average (EMA) Parameter Tracking
 
-For natural image datasets like CIFAR-10 ($3 \times 32 \times 32$), the architecture features:
-1. **Sinusoidal Position Encoding + SiLU MLP:** Maps discrete scalar timestep $t$ to continuous conditioning vector $e_{\text{time}} \in \mathbb{R}^{128}$.
-2. **Class Embedding:** Maps class index $y \in \{0, \dots, K\}$ to $e_{\text{class}} \in \mathbb{R}^{128}$, merged via element-wise addition:
-
-$$
-e_{\text{cond}} = e_{\text{time}} + e_{\text{class}}
-$$
-
-3. **Residual Blocks (`ResBlock`):** Pre-activation `GroupNorm` + `SiLU` + $3\times 3$ Conv with adaptive conditioning projection ($h + \text{Linear}(e_{\text{cond}})$) and residual skip paths.
-4. **Spatial Self-Attention:** Multi-head attention at $16 \times 16$ and $8 \times 8$ feature resolutions to coordinate long-range spatial correlations across object components.
-
----
-
-### 5.5 Exponential Moving Average (EMA) Parameter Tracking
-
-In diffusion models, gradients at step $t$ are computed across random noise scales ranging from near-zero noise ($t \approx 1$) to pure Gaussian chaos ($t \approx 1000$). This produces high stochastic gradient variance across batches.
-
-To stabilize inference and achieve photorealistic synthesis, modern diffusion models maintain an **Exponential Moving Average (EMA)** shadow copy of all model parameters ([Song & Ermon, 2020](https://arxiv.org/abs/1907.05600); [Ho et al., 2020](https://arxiv.org/abs/2006.11239)):
+To stabilize stochastic gradient fluctuations across timesteps $t \in [1, 1000]$, the training loop maintains an Exponential Moving Average (EMA) copy of the model parameters:
 
 $$
 \theta_{\text{EMA}} \leftarrow \beta \cdot \theta_{\text{EMA}} + (1 - \beta) \cdot \theta
 $$
 
-where $\beta \in [0.995, 0.9999]$ (typically $\beta = 0.999$):
-- **Training:** Backpropagation updates raw parameters $\theta$ via AdamW, and $\theta_{\text{EMA}}$ is updated as a running average.
-- **Inference & Sampling:** The shadow parameters $\theta_{\text{EMA}}$ are loaded into the U-Net for DDIM/DDPM reverse sampling, drastically smoothing out high-frequency artifacts, stabilizing contrast, and reducing FID scores.
+with decay $\beta = 0.999$. Sampling with $\theta_{\text{EMA}}$ significantly reduces visual artifacts and improves sample fidelity.
 
 ---
 
-## 6. Why Diffusion Outperformed GANs
+## 5. CLI Execution & Practical Usage
 
-In the landmark paper *"Diffusion Models Beat GANs on Image Synthesis"* ([Dhariwal & Nichol, NeurIPS 2021](https://arxiv.org/abs/2105.05233)), diffusion demonstrated superior mode coverage and sample fidelity:
+The script [`05_denoising_diffusion_model.py`](file:///Users/mghifary/Documents/ITB/IF5152/generative-models/05_denoising_diffusion_model.py) implements full training, checkpointing, and fast DDIM sampling:
 
-| Criterion | Generative Adversarial Networks (GANs) | Denoising Diffusion Models (DDPM) |
-| :--- | :--- | :--- |
-| **Optimization Stability** | ⚠️ Unstable minimax game; prone to mode collapse | ✅ Stable standard L2 regression objective |
-| **Mode Coverage** | ⚠️ Often misses rare modes of data distribution | ✅ Excellent diversity (covers full support of data) |
-| **Sample Quality** | ✅ Sharp, but fragile hyperparameter tuning | ✅ Superior fidelity and photo-realism |
-| **Sampling Latency** | ✅ 1 forward pass ($O(1)$) | ⚠️ 50–1000 iterative steps ($O(T)$) (accelerated via DDIM/flow matching) |
-| **Theoretical Rigor** | Game theory & saddle point equilibrium | Non-equilibrium thermodynamics & score matching ([Song et al., 2021](https://arxiv.org/abs/2011.13456)) |
-
-To overcome the pixel-space computational cost of high-resolution diffusion, modern foundation models (such as Stable Diffusion) operate in latent space (**Latent Diffusion Models**, [Rombach et al., CVPR 2022](https://arxiv.org/abs/2112.10752)).
-
----
-
-## 7. Generalized Diffusion: The Rectified Flow & Flow Matching Perspective
-
-In recent breakthroughs featured in modern foundation models (such as Stable Diffusion 3, Flux, and Movie Gen) and discussed in **Lecture 13 (Slides 180–181 & 204–212)**, diffusion is generalized through the lens of **Rectified Flow** ([Liu, Gong, & Liu, ICLR 2023](https://arxiv.org/abs/2209.03003); [Lipman et al., ICLR 2023](https://arxiv.org/abs/2210.02747); [Esser et al., 2024](https://arxiv.org/abs/2403.03206)).
-
-```mermaid
-flowchart LR
-    subgraph DDPM_Path ["DDPM / SDE: Curved Stochastic Hypersphere Path"]
-        A["Data x_0"] -.-> B["Curved Brownian Path"] -.-> C["Noise x_T"]
-    end
-
-    subgraph RF_Path ["Rectified Flow: Deterministic Straight-Line Path"]
-        D["Data x (t=0)"] ===|"dx/dt = v_gt = z - x"| E["x_t = (1 - t)x + tz"] ===|"Constant Velocity"| F["Noise z ~ N(0, I) (t=1)"]
-    end
+### Standard Training Command (CIFAR-10)
+```bash
+python IF5152/generative-models/05_denoising_diffusion_model.py \
+    --epochs 50 \
+    --batch-size 128 \
+    --lr 0.0002 \
+    --timesteps 1000 \
+    --ddim-steps 50 \
+    --cfg-scale 2.0 \
+    --ema-decay 0.999
 ```
 
-### 7.1 The Straight-Line Interpolation Trajectory
+### Fast Inference Only (Using Saved Checkpoint)
+```bash
+python IF5152/generative-models/05_denoising_diffusion_model.py \
+    --sample-only \
+    --checkpoint checkpoints/cddpm_cifar10_checkpoint.pt \
+    --ddim-steps 25 \
+    --cfg-scale 2.5
+```
 
-Unlike traditional DDPM, which introduces curvature via trigonometric variance-preserving schedules ($x_t = \sqrt{\bar{\alpha}_t} x + \sqrt{1 - \bar{\alpha}_t} \epsilon$), Rectified Flow connects data $x \sim p_{\text{data}}$ and standard normal noise $z \sim \mathcal{N}(0, \mathbf{I})$ along a straight line:
+### Command-Line Arguments Reference
 
-$$
-x_t = (1 - t) x + t z, \quad \text{for } t \in [0, 1]
-$$
-
-- At $t = 0$: $x_0 = x$ (authentic data image).
-- At $t = 1$: $x_1 = z$ (standard Gaussian noise).
-
-### 7.2 Constant Ground-Truth Velocity ($v_{\text{gt}}$)
-
-Taking the analytical time derivative of the straight trajectory yields a constant velocity field:
-
-$$
-v_{\text{gt}} = \frac{d x_t}{d t} = \frac{d}{dt}\big((1 - t) x + t z\big) = z - x
-$$
-
-The neural network $v_\theta(x_t, t, y)$ is trained to match this velocity field directly via standard mean squared error (MSE):
-
-$$
-\mathcal{L}_{\text{RF}}(\theta) = \mathbb{E}_{x \sim p_{\text{data}}, \, z \sim \mathcal{N}(0, \mathbf{I}), \, t \sim p(t)} \Big[ \| v_\theta(x_t, t, y) - (z - x) \|_2^2 \Big]
-$$
-
-### 7.3 Classifier-Free Guidance (CFG) in Velocity Space
-
-Following the formulation in Lecture Slides 161–169:
-1. **Training:** With probability $p_{\text{uncond}} = 0.15$, the class label $y$ is dropped and replaced with the unconditional token $y_\emptyset = 10$.
-2. **Inference:** The guided velocity vector $v_{\text{cfg}}$ pushes the trajectory away from the unconditioned density and toward the conditioned class distribution:
-
-$$
-v_{\text{cfg}}(x_t, t, y) = v_\theta(x_t, t, y_\emptyset) + s \cdot \big(v_\theta(x_t, t, y) - v_\theta(x_t, t, y_\emptyset)\big)
-$$
-
-where $s = 1 + w$ is the guidance scale (e.g. $s = 2.0$).
-
-### 7.4 Reverse Generation via Numerical ODE Solvers
-
-To synthesize a new image, we start from pure noise $x_1 \sim \mathcal{N}(0, \mathbf{I})$ at $t = 1$ and numerically integrate the probability flow ordinary differential equation (ODE) backwards to $t = 0$:
-
-$$
-\frac{d x_t}{d t} = v_\theta(x_t, t, y) \implies d x = v_\theta \, dt
-$$
-
-Because the trajectories are rectified (straightened), numerical ODE solvers can advance with large step sizes $\Delta t$:
-- **First-Order Euler Solver** ($\Delta t = 1/N$):
-  $$x_{t - \Delta t} = x_t - \Delta t \cdot v_{\text{cfg}}(x_t, t, y)$$
-- **Second-Order Heun Predictor-Corrector Solver**:
-  $$d_1 = v_{\text{cfg}}(x_t, t, y)$$
-  $$\hat{x} = x_t - \Delta t \cdot d_1$$
-  $$d_2 = v_{\text{cfg}}(\hat{x}, t - \Delta t, y)$$
-  $$x_{t - \Delta t} = x_t - \frac{\Delta t}{2} (d_1 + d_2)$$
-
-### 7.5 Comparison Matrix: DDPM vs. Rectified Flow
-
-| Feature / Property | DDPM (Ho et al. 2020) | Rectified Flow (Liu et al. 2023 / SD3) |
-| :--- | :--- | :--- |
-| **Trajectory Geometry** | Curved stochastic Markov chain | **Straight deterministic linear path** |
-| **Interpolant** | $x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon$ | **$x_t = (1 - t) x + t z$** |
-| **Training Target** | Injected Gaussian noise $\epsilon$ | **Velocity field $v = z - x$** |
-| **Sampling Mechanism** | Stochastic Langevin SDE / Ancestral | **Deterministic ODE Integration** |
-| **NFE (Steps to Sample)** | 50–1000 steps | **10–30 steps (Euler / Heun)** |
-| **Industry Adoption** | Stable Diffusion 1.5 / 2.1 | **Stable Diffusion 3, Flux, Movie Gen** |
+| Argument | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--epochs` | `int` | `50` | Total training epochs on CIFAR-10. |
+| `--batch-size` | `int` | `128` | Mini-batch training size. |
+| `--lr` | `float` | `0.0002` | AdamW learning rate. |
+| `--timesteps` | `int` | `1000` | Discrete timesteps $T$ for forward noising schedule. |
+| `--ddim-steps` | `int` | `50` | Number of sub-sequence steps $S$ for fast DDIM sampling. |
+| `--cfg-scale` | `float` | `2.0` | Classifier-Free Guidance extrapolation scale $w$. |
+| `--p-uncond` | `float` | `0.15` | Probability of dropping label to unconditional token $\emptyset$. |
+| `--ema-decay` | `float` | `0.999` | Exponential Moving Average decay rate. |
+| `--sample-only` | `flag` | `False` | Skip training and generate sample grids from checkpoint. |
+| `--checkpoint` | `str` | `None` | Path to load or resume model weights. |
 
 ---
 
-## 8. Summary & Reading Guide
+## 6. Forward Perspective: Straight Trajectories in Rectified Flow
 
-- **Reference Code (DDPM/DDIM: [`05_denoising_diffusion_model.py`](../05_denoising_diffusion_model.py)):** Hands-on PyTorch DDPM implementation featuring forward noising, U-Net with sinusoidal timestep embeddings, and reverse ancestral/DDIM sampling.
-- **Reference Code (Rectified Flow: [`06_rectified_flow_cifar10.py`](../06_rectified_flow_cifar10.py)):** Class-conditional Rectified Flow with straight-line interpolation, velocity matching, CFG, and Euler/Heun ODE solvers.
-- **Top-Level Lab Overview ([`README.md`](../README.md)):** Master comparison table covering all generative paradigms.
+While DDIM accelerates diffusion by taking deterministic strides along curved stochastic paths, recent foundation models (such as Stable Diffusion 3 and Flux) generalize diffusion using **Rectified Flow & Flow Matching**, connecting noise and data along deterministic **straight-line paths** with constant velocity.
+
+For complete theoretical derivations, ODE vector fields, and CIFAR-10 implementation details, refer to the next guide:
+➡️ **[`06_rectified_flow.md`](./06_rectified_flow.md): Rectified Flow & Flow Matching: Straight-Line ODE Trajectories**.
 
 ---
 
 ## 📚 References & Canonical Literature
 
-1. **Foundational Non-Equilibrium Thermodynamics Diffusion:**
+1. **Foundations of Diffusion & Non-Equilibrium Thermodynamics:**
    - Sohl-Dickstein, J., Weiss, E., Khan, N., & Sompolinsky, H. (2015). "Deep Unsupervised Learning using Nonequilibrium Thermodynamics". *International Conference on Machine Learning (ICML 2015)*. [https://arxiv.org/abs/1503.03585](https://arxiv.org/abs/1503.03585)
-
-2. **Denoising Diffusion Probabilistic Models (DDPM):**
    - Ho, J., Jain, A., & Abbeel, P. (2020). "Denoising Diffusion Probabilistic Models". *Advances in Neural Information Processing Systems (NeurIPS 2020)*. [https://arxiv.org/abs/2006.11239](https://arxiv.org/abs/2006.11239)
-   - Nichol, A. Q., & Dhariwal, P. (2021). "Improved Denoising Diffusion Probabilistic Models". *International Conference on Machine Learning (ICML 2021)*. [https://arxiv.org/abs/2102.09672](https://arxiv.org/abs/2102.09672)
 
-3. **Score-Based Generative Modeling & SDEs:**
-   - Song, Y., & Ermon, S. (2019). "Generative Modeling by Estimating Gradients of the Data Distribution". *Advances in Neural Information Processing Systems (NeurIPS 2019)*. [https://arxiv.org/abs/1907.05600](https://arxiv.org/abs/1907.05600)
-   - Song, Y., Sohl-Dickstein, J., Kingma, D. P., Kumar, A., Ermon, S., & Poole, B. (2021). "Score-Based Generative Modeling through Stochastic Differential Equations". *International Conference on Learning Representations (ICLR 2021)*. [https://arxiv.org/abs/2011.13456](https://arxiv.org/abs/2011.13456)
-
-4. **Fast Sampling & Guidance:**
+2. **Accelerated Non-Markovian Sampling (DDIM):**
    - Song, J., Meng, C., & Ermon, S. (2021). "Denoising Diffusion Implicit Models". *International Conference on Learning Representations (ICLR 2021)*. [https://arxiv.org/abs/2010.02502](https://arxiv.org/abs/2010.02502)
-   - Dhariwal, P., & Nichol, A. (2021). "Diffusion Models Beat GANs on Image Synthesis". *Advances in Neural Information Processing Systems (NeurIPS 2021)*. [https://arxiv.org/abs/2105.05233](https://arxiv.org/abs/2105.05233)
+
+3. **Classifier-Free Guidance:**
    - Ho, J., & Salimans, T. (2022). "Classifier-Free Diffusion Guidance". *NeurIPS 2022 Workshop on Score-Based Methods*. [https://arxiv.org/abs/2207.12598](https://arxiv.org/abs/2207.12598)
 
-5. **Latent Diffusion & High-Resolution Synthesis:**
-   - Rombach, R., Blattmann, A., Lorenz, D., Esser, P., & Ommer, B. (2022). "High-Resolution Image Synthesis with Latent Diffusion Models". *IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR 2022)*. [https://arxiv.org/abs/2112.10752](https://arxiv.org/abs/2112.10752)
-
-6. **Rectified Flow & Flow Matching:**
-   - Liu, X., Gong, C., & Liu, Q. (2023). "Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow". *International Conference on Learning Representations (ICLR 2023)*. [https://arxiv.org/abs/2209.03003](https://arxiv.org/abs/2209.03003)
-   - Lipman, Y., Chen, R. T. Q., Ben-Hamu, H., Nicklas, M., & Le, M. (2023). "Flow Matching for Generative Modeling". *International Conference on Learning Representations (ICLR 2023)*. [https://arxiv.org/abs/2210.02747](https://arxiv.org/abs/2210.02747)
-   - Esser, P., Kulal, S., Blattmann, A., Entezari, R., Müller, J., Saini, H., Levi, Y., Lorenz, D., Sauer, A., Boesel, F., Podell, D., Dockhorn, T., Zheng, Z., & Ommer, B. (2024). "Scaling Rectified Flow Transformers for High-Resolution Image Synthesis". *arXiv:2403.03206*. [https://arxiv.org/abs/2403.03206](https://arxiv.org/abs/2403.03206)
+4. **Diffusion Beating GANs:**
+   - Dhariwal, P., & Nichol, A. (2021). "Diffusion Models Beat GANs on Image Synthesis". *Advances in Neural Information Processing Systems (NeurIPS 2021)*. [https://arxiv.org/abs/2105.05233](https://arxiv.org/abs/2105.05233)

@@ -3,7 +3,7 @@
 =========================
 Classical (Deterministic) Autoencoders and the Limits of Latent Generation.
 
-Key Concepts (Lecture 13, Slides 63-70):
+Key Theoretical Concepts:
 - Unsupervised representation learning via input reconstruction: ||x_hat - x||^2.
 - Deterministic encoder z = f_enc(x) and decoder x_hat = f_dec(z).
 - Why Vanilla Autoencoders are NOT Generative Models:
@@ -122,7 +122,7 @@ def train_autoencoder(args):
             title="Vanilla AE: Top row = Original, Bottom row = Reconstructed",
         )
 
-        # Demonstration 2: Failure of Naive Latent Sampling (Lecture Slide 69-70)
+        # Demonstration 2: Failure of Naive Latent Sampling (Unregularized Prior)
         print("\nDemonstrating why Vanilla AE fails as a generative model...")
         random_z = torch.randn(32, args.latent_dim, device=device)
         failed_samples = model.decode(random_z)

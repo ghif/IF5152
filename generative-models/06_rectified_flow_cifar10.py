@@ -3,7 +3,7 @@
 ============================
 Class-Conditional Rectified Flow on CIFAR-10 ($3 \times 32 \times 32$, 10 Classes).
 
-Theoretical Foundations (IF5152 Lecture Slides, Pages 180-181 & 204-212):
+Theoretical Foundations (Liu et al. 2023; Lipman et al. 2023):
 1. Generalized Diffusion: Rectified Flow (Liu et al. ICLR 2023; Lipman et al. 2023):
    - Rather than simulating curved SDE diffusion paths (DDPM/VP/VE), Rectified Flow
      connects data x ~ p_data and Gaussian noise z ~ N(0, I) via a straight linear trajectory:
@@ -19,13 +19,13 @@ Theoretical Foundations (IF5152 Lecture Slides, Pages 180-181 & 204-212):
    - A parameterized neural network v_theta(x_t, t, y) learns the vector field:
          L_RF(theta) = E_{x, z, t, y} [ || v_theta(x_t, t, y) - (z - x) ||_2^2 ]
 
-4. Classifier-Free Guidance (CFG) in Velocity Space (Pages 161-169):
+4. Classifier-Free Guidance (CFG) in Velocity Space:
    - During training: Random label dropout (p_uncond = 0.15) substituting null token y_null = 10.
    - During inference: Extrapolate velocity along the conditioned direction:
          v_cfg = v_theta(x_t, t, y_null) + s * (v_theta(x_t, t, y) - v_theta(x_t, t, y_null))
      where s = 1 + w is the guidance scale (e.g. s = 2.0).
 
-5. Reverse ODE Integration (Pages 204-208):
+5. Reverse ODE Integration:
    - Sampling starts from pure noise x_1 ~ N(0, I) at t = 1 and integrates backwards to t = 0:
          dx_t / dt = v_theta(x_t, t, y)  =>  x_{t - dt} = x_t - dt * v_cfg
    - Supported Numerical Solvers:
@@ -297,7 +297,7 @@ class RectifiedFlow:
     def sample_time(self, batch_size: int, device: torch.device) -> torch.Tensor:
         """
         Samples continuous timesteps t in [0, 1].
-        Supports uniform or logit-normal distribution (Slide 180).
+        Supports uniform or logit-normal distribution.
         """
         if self.time_schedule == "logit_normal":
             # Logit-normal puts more emphasis on ambiguous middle noise
@@ -341,7 +341,7 @@ class RectifiedFlow:
         b = x.size(0)
         x_t, t, v_gt, _ = self.get_train_tuple(x, device)
 
-        # Apply random label dropout for Classifier-Free Guidance (Slides 161-164)
+        # Apply random label dropout for Classifier-Free Guidance
         if p_uncond > 0:
             mask = torch.rand(b, device=device) < p_uncond
             y_train = y.clone()
@@ -567,7 +567,7 @@ def train_rectified_flow(
 
     print(f"\n========================================================")
     print(f"  Class-Conditional Rectified Flow on CIFAR-10          ")
-    print(f"  Reference: IF5152 Slides (Pages 180-181 & 204-212)    ")
+    print(f"  Reference: Rectified Flow (Liu et al. 2023; Lipman et al. 2023)")
     print(f"========================================================")
     print(f"  Epochs           : {epochs} (starting at {start_epoch})")
     print(f"  Batch Size       : {batch_size}")
@@ -758,7 +758,7 @@ def generate_grid_from_checkpoint(
 # ==============================================================================
 def main():
     parser = argparse.ArgumentParser(
-        description="IF5152: Class-Conditional Rectified Flow on CIFAR-10 (Lecture Slides 180-181 & 204-212)"
+        description="Class-Conditional Rectified Flow on CIFAR-10 (Liu et al. 2023)"
     )
     parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs (default: 50)")
     parser.add_argument("--batch-size", type=int, default=128, help="Batch size (default: 128)")

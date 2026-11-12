@@ -4,7 +4,7 @@
 Unified Deep Convolutional Generative Adversarial Network (DCGAN).
 Supports MNIST (1x28x28), Fashion-MNIST (1x28x28), and CIFAR-10 (3x32x32).
 
-Key Concepts & Architecture Guidelines (Radford et al., ICLR 2016; Lecture 13):
+Key Concepts & Architecture Guidelines (Radford et al., ICLR 2016):
 1. Implicit Density: Does NOT compute p(x), directly samples G(z) ~ p_g in O(1).
 2. Two-Player Minimax Game:
      min_G max_D V(D, G) = E[log D(x)] + E[log(1 - D(G(z)))]
