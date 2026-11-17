@@ -94,7 +94,3 @@ For example, a unit sphere is $f(x, y, z) = x^2 + y^2 + z^2 - 1 = 0$.
 ### 5.2 Core Learning Tasks
 1. **Discriminative Models $p(y \mid x)$:** Learning 3D shape descriptors for classification, part segmentation, semantic scene parsing, and retrieval.
 2. **Generative Models $p(x)$ or $p(x \mid y)$:** Learning 3D shape priors for unconditional generation, single-view 3D reconstruction, shape completion, and geometry editing.
-
-*(Complementary 2.5D Note: View-centric depth estimation models such as **DepthAnything** predict per-pixel depth $Z(u,v)$ from 2D images, bridging single-view 2D perception to 3D geometry despite perspective scale/depth ambiguity.)*
-
-![Depth Anything Semi-Supervised Training Pipeline (Yang et al., CVPR 2024)](figures/depth_anything_pipeline.png)
