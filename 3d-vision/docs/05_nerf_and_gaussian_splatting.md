@@ -94,3 +94,5 @@ A core conceptual distinction between NeRF and 3D Gaussian Splatting lies in **h
 | **Memory Footprint** | Compact ($\sim 5$–$20\text{ MB}$) | Larger ($\sim 100$–$500\text{ MB}$) |
 
 > **Hands-On Implementation:** See [`07_gaussian_splatting.py`](../07_gaussian_splatting.py).
+>
+> **State-of-the-Art Literature Review (2023–2026):** See [`05b_3dgs_state_of_the_art.md`](./05b_3dgs_state_of_the_art.md) for a curated review of post-2023 advances (Mip-Splatting, 2DGS, 3DGRT/3DGUT, MVSplat/AnySplat, Scaffold-GS/HAC, 4DGS, PhysGaussian, and SplaTAM).
